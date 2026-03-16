@@ -45,6 +45,10 @@ class RunPlaylistFindReplaceRules implements ShouldQueue
         foreach ($rules as $rule) {
             $target = $rule['target'] ?? 'channels';
 
+            // Skip if no find & replace value is set
+            if (empty($rule['find_replace'])) {
+                continue;
+            }
             if ($target === 'channels') {
                 (new ChannelFindAndReplace(
                     user_id: $this->playlist->user_id,

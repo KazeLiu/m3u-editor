@@ -29,7 +29,7 @@ class SyncListener
             }
 
             // Handle saved find & replace rules
-            if (collect($playlist->find_replace_rules ?? [])->contains(fn ($r) => $r['enabled'] ?? false)) {
+            if ($playlist->status === Status::Completed && collect($playlist->find_replace_rules ?? [])->contains(fn ($r) => $r['enabled'] ?? false)) {
                 dispatch(new RunPlaylistFindReplaceRules($playlist));
             }
 
