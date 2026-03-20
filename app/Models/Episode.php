@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\URL;
 use Symfony\Component\Process\Process as SymfonyProcess;
 
 class Episode extends Model
@@ -82,7 +83,7 @@ class Episode extends Model
         $profile = $profileId ? StreamProfile::find($profileId) : null;
 
         // Always proxy the internal proxy so we can attempt to transcode the stream for better compatibility
-        $url = route('m3u-proxy.episode.player', ['id' => $this->id]);
+        $url = URL::temporarySignedRoute('m3u-proxy.episode.player', now()->addHour(), ['id' => $this->id], absolute: false);
 
         // Determine the channel format based on URL or container extension
         $originalUrl = $this->url;

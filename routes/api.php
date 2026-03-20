@@ -31,9 +31,11 @@ Route::middleware(['proxy.throttle'])->prefix('m3u-proxy')->group(function () {
 
     // Player preview routes
     Route::get('channel/{id}/player/{uuid?}', [M3uProxyApiController::class, 'channelPlayer'])
-        ->name('m3u-proxy.channel.player');
+        ->name('m3u-proxy.channel.player')
+        ->middleware('signed:relative');
     Route::get('episode/{id}/player/{uuid?}', [M3uProxyApiController::class, 'episodePlayer'])
-        ->name('m3u-proxy.episode.player');
+        ->name('m3u-proxy.episode.player')
+        ->middleware('signed:relative');
 
     // Main proxy routes
     Route::post('webhooks', [M3uProxyApiController::class, 'handleWebhook'])
@@ -46,7 +48,9 @@ Route::middleware(['proxy.throttle'])->prefix('m3u-proxy')->group(function () {
 
     // Content access routes
     Route::get('channel/{id}/{uuid?}', [M3uProxyApiController::class, 'channel'])
-        ->name('m3u-proxy.channel');
+        ->name('m3u-proxy.channel')
+        ->middleware('signed:relative,username');
     Route::get('episode/{id}/{uuid?}', [M3uProxyApiController::class, 'episode'])
-        ->name('m3u-proxy.episode');
+        ->name('m3u-proxy.episode')
+        ->middleware('signed:relative,username');
 });

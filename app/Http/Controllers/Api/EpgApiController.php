@@ -18,6 +18,7 @@ use Exception;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\URL;
 use Illuminate\Support\Str;
 
 class EpgApiController extends Controller
@@ -331,10 +332,10 @@ class EpgApiController extends Controller
                 }
 
                 // Always proxy the internal proxy so we can attempt to transcode the stream for better compatibility
-                $url = route('m3u-proxy.channel.player', [
+                $url = URL::temporarySignedRoute('m3u-proxy.channel.player', now()->addHour(), [
                     'id' => $channel->id,
                     'uuid' => $playlist->uuid,
-                ]);
+                ], absolute: false);
 
                 // Determine the channel format based on URL or container extension
                 $originalUrl = $channel->url_custom ?? $channel->url;

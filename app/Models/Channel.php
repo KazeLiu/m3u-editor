@@ -18,6 +18,7 @@ use Illuminate\Database\Eloquent\Relations\HasManyThrough;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\URL;
 use Spatie\Tags\HasTags;
 use Symfony\Component\Process\Process as SymfonyProcess;
 
@@ -154,7 +155,7 @@ class Channel extends Model
 
         // Always proxy the internal player so we can attempt to transcode the stream for better compatibility
         // This also prevents CORS and mixed-content issues
-        $url = route('m3u-proxy.channel.player', ['id' => $this->id]);
+        $url = URL::temporarySignedRoute('m3u-proxy.channel.player', now()->addHour(), ['id' => $this->id], absolute: false);
 
         // Determine the channel format based on URL or container extension
         $originalUrl = $this->url_custom ?? $this->url;

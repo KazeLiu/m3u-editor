@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Settings\GeneralSettings;
+use Illuminate\Support\Facades\URL;
 
 /**
  * Service to handle proxy URL generation for channels and episodes.
@@ -60,17 +61,17 @@ class ProxyService
      *
      * @param  string|int  $id
      * @param  string|null  $playlistUuid  Optional playlist UUID for context (e.g., merged playlists)
-     * @param  string|null  $username  Optional username for user-specific URLs
+     * @param  string|null  $username  Optional username appended after signing (ignored during signature validation)
      * @return string
      */
     public function getProxyUrlForChannel($id, $playlistUuid = null, $username = null)
     {
-        $url = $this->baseUrl.'/api/m3u-proxy/channel/'.$id;
-        if ($playlistUuid) {
-            $url .= '/'.$playlistUuid;
-        }
+        $params = array_filter(['id' => $id, 'uuid' => $playlistUuid]);
+        $url = $this->temporarySignedRoute('m3u-proxy.channel', $params);
+
+        // Username is appended after signing; the signed middleware ignores it during validation
         if ($username) {
-            $url .= '?username='.urlencode($username);
+            $url .= '&username='.urlencode($username);
         }
 
         return $url;
@@ -85,12 +86,24 @@ class ProxyService
      */
     public function getProxyUrlForEpisode($id, $playlistUuid = null)
     {
-        $url = $this->baseUrl.'/api/m3u-proxy/episode/'.$id;
-        if ($playlistUuid) {
-            $url .= '/'.$playlistUuid;
-        }
+        $params = array_filter(['id' => $id, 'uuid' => $playlistUuid]);
 
-        // Note: Username is now passed via X-Username header, not query param
-        return $url;
+        return $this->temporarySignedRoute('m3u-proxy.episode', $params);
+    }
+
+    /**
+     * Generate a 1-hour temporary signed route URL.
+     *
+     * Uses a relative signature (path + query only) so that it works correctly
+     * regardless of the configured base URL override or proxy environment.
+     * The base URL is then prepended to produce a fully absolute URL for external clients.
+     */
+    private function temporarySignedRoute(string $name, array $parameters = []): string
+    {
+        // Generate with absolute: false so the signature covers only the relative path,
+        // making it immune to scheme/host differences (e.g. reverse proxies, URL overrides).
+        $relativePath = URL::temporarySignedRoute($name, now()->addHour(), $parameters, absolute: false);
+
+        return $this->baseUrl.$relativePath;
     }
 }
