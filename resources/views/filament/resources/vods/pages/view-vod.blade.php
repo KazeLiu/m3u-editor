@@ -71,7 +71,7 @@
             'content_type' => 'vod',
             'playlist_id' => $record->playlist_id,
             'title' => $title,
-            'url' => route('m3u-proxy.channel.player', ['id' => $record->id]),
+            'url' => $record->getProxyUrl(),
             'format' => $record->container_extension ?? 'ts',
             'type' => 'channel',
         ]);
@@ -295,7 +295,7 @@
                 <div class="col-span-full">
                     <span class="text-sm text-gray-500">Proxy URL</span>
                     <div class="font-mono text-sm bg-gray-100 dark:bg-gray-800 p-2 rounded mt-1 overflow-x-auto">
-                        {{ $record->proxy_url }}
+                        {{ $record->getProxyUrl() }}
                     </div>
                 </div>
             </div>

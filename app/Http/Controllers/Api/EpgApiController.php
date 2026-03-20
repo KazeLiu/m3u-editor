@@ -174,6 +174,7 @@ class EpgApiController extends Controller
         }
 
         $cacheService = new EpgCacheService;
+        $user = $playlist->user;
 
         // Pagination parameters
         $page = (int) $request->get('page', 1);
@@ -331,21 +332,8 @@ class EpgApiController extends Controller
                         break;
                 }
 
-                // Always proxy the internal proxy so we can attempt to transcode the stream for better compatibility
-                $url = URL::temporarySignedRoute('m3u-proxy.channel.player', now()->addHour(), [
-                    'id' => $channel->id,
-                    'uuid' => $playlist->uuid,
-                ], absolute: false);
-
-                // Determine the channel format based on URL or container extension
-                $originalUrl = $channel->url_custom ?? $channel->url;
-                if (Str::endsWith($originalUrl, '.m3u8')) {
-                    $channelFormat = 'm3u8';
-                } elseif (Str::endsWith($originalUrl, '.ts')) {
-                    $channelFormat = 'ts';
-                } else {
-                    $channelFormat = $channel->container_extension ?? 'ts';
-                }
+                // Get the channel URL from the computed attribute, which handles proxy logic
+                $url = $channel->getProxyUrl();
 
                 // Get the icon
                 $icon = '';

@@ -4,7 +4,6 @@ namespace App\Models;
 
 use App\Enums\ChannelLogoType;
 use App\Enums\PlaylistSourceType;
-use App\Facades\ProxyFacade;
 use App\Jobs\FetchTmdbIds;
 use App\Services\XtreamService;
 use App\Settings\GeneralSettings;
@@ -19,6 +18,7 @@ use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\URL;
+use Illuminate\Support\Str;
 use Spatie\Tags\HasTags;
 use Symfony\Component\Process\Process as SymfonyProcess;
 
@@ -155,14 +155,10 @@ class Channel extends Model
 
         // Always proxy the internal player so we can attempt to transcode the stream for better compatibility
         // This also prevents CORS and mixed-content issues
-        $url = URL::temporarySignedRoute('m3u-proxy.channel.player', now()->addHour(), ['id' => $this->id], absolute: false);
-
-        // Determine the channel format based on URL or container extension
-        $originalUrl = $this->url_custom ?? $this->url;
-        $format = pathinfo($originalUrl, PATHINFO_EXTENSION);
-        if (empty($format)) {
-            $format = $this->container_extension ?? 'ts';
-        }
+        [$url, $format] = $this->getProxyUrl(
+            withFormat: true,
+            profileFormat: $profile->format ?? null
+        );
 
         return [
             'id' => $this->id,
@@ -188,13 +184,52 @@ class Channel extends Model
     /**
      * The attributes that are mass assignable.
      *
-     * @var string
+     * @var string|array
      */
-    public function getProxyUrlAttribute(): string
+    public function getProxyUrl(?bool $withFormat = false, ?string $profileFormat = null)
     {
-        return ProxyFacade::getProxyUrlForChannel(
-            $this->id,
-        );
+        // Load the effective playlist to determine proxy settings and get UUID for authentication
+        $playlist = $this->getEffectivePlaylist();
+        $user = $this->user;
+        $originalUrl = $this->url_custom ?? $this->url;
+
+        // Extract the filename from the URL to determine the format (extension)
+        $filename = parse_url($originalUrl, PHP_URL_PATH);
+
+        // Determine the channel format based on URL or container extension
+        if (Str::endsWith($filename, '.m3u8')) {
+            $channelFormat = 'm3u8';
+        } elseif (Str::endsWith($filename, '.ts')) {
+            $channelFormat = 'ts';
+        } else {
+            if ($playlist->xtream ?? false) {
+                $channelFormat = $playlist->xtream_config['output'] ?? 'ts'; // Default to 'ts' if not set
+            } else {
+                $channelFormat = $this->container_extension ?? 'ts';
+            }
+        }
+        $urlPath = 'live';
+        if ($this->is_vod) {
+            $urlPath = 'movie';
+            $channelFormat = $this->container_extension ?? $channelFormat ?? 'mkv';
+        }
+
+        // If a specific format is provided (e.g. from a StreamProfile), use that instead of the detected format
+        if ($profileFormat) {
+            $channelFormat = $profileFormat;
+        }
+
+        // Always proxy the internal proxy so we can attempt to transcode the stream for better compatibility
+        // This also prevents CORS and mixed-content issues
+        $username = urlencode($user->name ?? 'admin');
+        $url = rtrim(url("/{$urlPath}/{$username}/{$playlist->uuid}/".$this->id.'.'.$channelFormat), '.');
+
+        // Append query parameter so our Xtream Stream controller knows to proxy the stream regardless of playlist settings
+        $url .= '?'.http_build_query([
+            'proxy' => 'true',
+        ]);
+
+        return $withFormat ? [$url, $channelFormat] : $url;
     }
 
     /**

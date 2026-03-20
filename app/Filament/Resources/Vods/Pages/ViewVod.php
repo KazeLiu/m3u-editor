@@ -6,7 +6,6 @@ use App\Filament\Resources\Vods\VodResource;
 use Filament\Actions;
 use Filament\Resources\Pages\ViewRecord;
 use Illuminate\Contracts\Support\Htmlable;
-use Illuminate\Support\Facades\URL;
 
 class ViewVod extends ViewRecord
 {
@@ -78,7 +77,7 @@ class ViewVod extends ViewRecord
                     'content_type' => 'vod',
                     'playlist_id' => $this->record->playlist_id,
                     'title' => $this->record->title_custom ?? $this->record->title ?? $this->record->name,
-                    'url' => URL::temporarySignedRoute('m3u-proxy.channel.player', now()->addHour(), ['id' => $this->record->id], absolute: false),
+                    'url' => $this->record->getProxyUrl(),
                     'format' => $this->record->container_extension ?? 'ts',
                     'type' => 'channel',
                 ]]),
