@@ -2313,6 +2313,7 @@ class PlaylistResource extends Resource
                                 ->options([
                                     'channels' => 'Channels (Live & VOD)',
                                     'series' => 'Series',
+                                    'groups' => 'Groups',
                                 ])
                                 ->default('channels')
                                 ->required()
@@ -2326,6 +2327,9 @@ class PlaylistResource extends Resource
                                         'genre' => 'Genre',
                                         'plot' => 'Plot',
                                     ],
+                                    'groups' => [
+                                        'name' => 'Group Name',
+                                    ],
                                     default => [
                                         'title' => 'Channel Title',
                                         'name' => 'Channel Name (tvg-name)',
@@ -2333,7 +2337,7 @@ class PlaylistResource extends Resource
                                         'info->genre' => 'Genre (metadata)',
                                     ],
                                 })
-                                ->default('title')
+                                ->default(fn (Get $get): string => $get('target') === 'groups' ? 'name' : 'title')
                                 ->required()
                                 ->columnSpan(2),
 
