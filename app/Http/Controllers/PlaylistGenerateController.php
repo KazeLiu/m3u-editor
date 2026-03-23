@@ -698,7 +698,7 @@ class PlaylistGenerateController extends Controller
             ]);
         }
 
-        $baseUrl = url('/');
+        $baseUrl = ProxyFacade::getBaseUrl();
 
         return response()->stream(function () use ($networks, $baseUrl, $playlist) {
             // M3U header with EPG URL
