@@ -2313,13 +2313,14 @@ class PlaylistResource extends Resource
                                 ->options([
                                     'channels' => 'Channels (Live & VOD)',
                                     'series' => 'Series',
-                                    'groups' => 'Groups',
+                                    'groups' => 'Groups (Live & VOD)',
+                                    'categories' => 'Categories (Series)',
                                 ])
                                 ->default('channels')
                                 ->required()
                                 ->live()
                                 ->afterStateUpdated(fn (Set $set, ?string $state) => $set('column', match ($state) {
-                                    'groups', 'series' => 'name',
+                                    'groups', 'categories', 'series' => 'name',
                                     default => 'title',
                                 }))
                                 ->columnSpan(2),
@@ -2334,6 +2335,9 @@ class PlaylistResource extends Resource
                                     'groups' => [
                                         'name' => 'Group Name',
                                     ],
+                                    'categories' => [
+                                        'name' => 'Category Name',
+                                    ],
                                     default => [
                                         'title' => 'Channel Title',
                                         'name' => 'Channel Name (tvg-name)',
@@ -2341,7 +2345,10 @@ class PlaylistResource extends Resource
                                         'info->genre' => 'Genre (metadata)',
                                     ],
                                 })
-                                ->default(fn (Get $get): string => $get('target') === 'groups' ? 'name' : 'title')
+                                ->default(fn (Get $get): string => match ($get('target')) {
+                                    'groups', 'categories', 'series' => 'name',
+                                    default => 'title',
+                                })
                                 ->required()
                                 ->columnSpan(2),
 
