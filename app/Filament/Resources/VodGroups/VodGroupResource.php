@@ -6,6 +6,8 @@ use App\Facades\SortFacade;
 use App\Filament\Resources\VodGroups\Pages\EditVodGroup;
 use App\Filament\Resources\VodGroups\Pages\ListVodGroups;
 use App\Filament\Resources\VodGroups\RelationManagers\VodRelationManager;
+use App\Jobs\GroupFindAndReplace;
+use App\Jobs\GroupFindAndReplaceReset;
 use App\Jobs\ProcessVodChannels;
 use App\Jobs\SyncVodStrmFiles;
 use App\Models\Group;
@@ -27,6 +29,7 @@ use Filament\Resources\Resource;
 use Filament\Schemas\Components\Group as ComponentsGroup;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Components\Utilities\Get;
+use Filament\Schemas\Components\Utilities\Set;
 use Filament\Schemas\Schema;
 use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\TextColumn;
@@ -565,6 +568,108 @@ class VodGroupResource extends Resource
                         ->modalIcon('heroicon-o-x-circle')
                         ->modalDescription('Disable the selected group(s) now?')
                         ->modalSubmitActionLabel('Yes, disable now'),
+                    BulkAction::make('find-replace')
+                        ->label('Find & Replace')
+                        ->schema(function (): array {
+                            $savedPatterns = [];
+                            $savedPatternRules = [];
+                            $counter = 0;
+                            foreach (Playlist::where('user_id', auth()->id())->get() as $playlist) {
+                                foreach ($playlist->find_replace_rules ?? [] as $rule) {
+                                    if (is_array($rule) && ($rule['target'] ?? 'channels') === 'groups') {
+                                        $savedPatterns[$counter] = "{$playlist->name} - ".($rule['name'] ?? 'Unnamed');
+                                        $savedPatternRules[$counter] = $rule;
+                                        $counter++;
+                                    }
+                                }
+                            }
+
+                            return [
+                                Select::make('saved_pattern')
+                                    ->label('Load saved pattern')
+                                    ->searchable()
+                                    ->placeholder('Select a saved pattern...')
+                                    ->options($savedPatterns)
+                                    ->hidden(empty($savedPatterns))
+                                    ->live()
+                                    ->afterStateUpdated(function (?string $state, Set $set) use ($savedPatternRules): void {
+                                        if ($state === null || $state === '') {
+                                            return;
+                                        }
+                                        $rule = $savedPatternRules[(int) $state] ?? null;
+                                        if (! $rule) {
+                                            return;
+                                        }
+                                        $set('use_regex', $rule['use_regex'] ?? true);
+                                        $set('find_replace', $rule['find_replace'] ?? '');
+                                        $set('replace_with', $rule['replace_with'] ?? '');
+                                    })
+                                    ->dehydrated(false),
+                                Toggle::make('use_regex')
+                                    ->label('Use Regex')
+                                    ->live()
+                                    ->helperText('Use regex patterns to find and replace. If disabled, will use direct string comparison.')
+                                    ->default(true),
+                                TextInput::make('find_replace')
+                                    ->label(fn (Get $get) => ! $get('use_regex') ? 'String to replace' : 'Pattern to replace')
+                                    ->required()
+                                    ->placeholder(
+                                        fn (Get $get) => $get('use_regex')
+                                            ? '^(US- |UK- |CA- )'
+                                            : 'US -'
+                                    )->helperText(
+                                        fn (Get $get) => ! $get('use_regex')
+                                            ? 'This is the string you want to find and replace.'
+                                            : 'This is the regex pattern you want to find. Make sure to use valid regex syntax.'
+                                    ),
+                                TextInput::make('replace_with')
+                                    ->label('Replace with (optional)')
+                                    ->placeholder('Leave empty to remove'),
+                            ];
+                        })
+                        ->action(function (Collection $records, array $data): void {
+                            app('Illuminate\Contracts\Bus\Dispatcher')
+                                ->dispatch(new GroupFindAndReplace(
+                                    user_id: auth()->id(),
+                                    use_regex: $data['use_regex'] ?? true,
+                                    find_replace: $data['find_replace'] ?? null,
+                                    replace_with: $data['replace_with'] ?? '',
+                                    groups: $records,
+                                ));
+                        })->after(function () {
+                            Notification::make()
+                                ->success()
+                                ->title('Find & Replace started')
+                                ->body('Find & Replace working in the background. You will be notified once the process is complete.')
+                                ->send();
+                        })
+                        ->requiresConfirmation()
+                        ->icon('heroicon-o-magnifying-glass')
+                        ->color('gray')
+                        ->modalIcon('heroicon-o-magnifying-glass')
+                        ->modalDescription('Select what you would like to find and replace in the selected group names.')
+                        ->modalSubmitActionLabel('Replace now'),
+                    BulkAction::make('find-replace-reset')
+                        ->label('Undo Find & Replace')
+                        ->action(function (Collection $records): void {
+                            app('Illuminate\Contracts\Bus\Dispatcher')
+                                ->dispatch(new GroupFindAndReplaceReset(
+                                    user_id: auth()->id(),
+                                    groups: $records,
+                                ));
+                        })->after(function () {
+                            Notification::make()
+                                ->success()
+                                ->title('Find & Replace reset started')
+                                ->body('Find & Replace reset working in the background. You will be notified once the process is complete.')
+                                ->send();
+                        })
+                        ->requiresConfirmation()
+                        ->icon('heroicon-o-arrow-uturn-left')
+                        ->color('warning')
+                        ->modalIcon('heroicon-o-arrow-uturn-left')
+                        ->modalDescription('Reset group names back to their original imported values? This will undo any find & replace changes.')
+                        ->modalSubmitActionLabel('Reset now'),
                 ]),
             ]);
     }
