@@ -25,6 +25,7 @@ class GroupFindAndReplace implements ShouldQueue
         public ?Collection $groups = null,
         public ?int $playlist_id = null,
         public bool $silent = false,
+        public ?string $group_type = null,
     ) {
         //
     }
@@ -41,6 +42,7 @@ class GroupFindAndReplace implements ShouldQueue
             Group::query()
                 ->where('user_id', $this->user_id)
                 ->when($this->playlist_id, fn ($query) => $query->where('playlist_id', $this->playlist_id))
+                ->when($this->group_type, fn ($query) => $query->where('type', $this->group_type))
                 ->chunkById(1000, function ($groups) use (&$updated) {
                     $updated += $this->processGroupChunk($groups);
                 });

@@ -13,6 +13,7 @@ use App\Jobs\SyncVodStrmFiles;
 use App\Models\Group;
 use App\Models\Playlist;
 use App\Services\DateFormatService;
+use App\Services\FindReplaceService;
 use App\Services\PlaylistService;
 use App\Traits\HasUserFiltering;
 use Filament\Actions\Action;
@@ -29,7 +30,6 @@ use Filament\Resources\Resource;
 use Filament\Schemas\Components\Group as ComponentsGroup;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Components\Utilities\Get;
-use Filament\Schemas\Components\Utilities\Set;
 use Filament\Schemas\Schema;
 use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\TextColumn;
@@ -570,63 +570,7 @@ class VodGroupResource extends Resource
                         ->modalSubmitActionLabel('Yes, disable now'),
                     BulkAction::make('find-replace')
                         ->label('Find & Replace')
-                        ->schema(function (): array {
-                            $savedPatterns = [];
-                            $savedPatternRules = [];
-                            $counter = 0;
-                            foreach (Playlist::where('user_id', auth()->id())->get() as $playlist) {
-                                foreach ($playlist->find_replace_rules ?? [] as $rule) {
-                                    if (is_array($rule) && ($rule['target'] ?? 'channels') === 'groups') {
-                                        $savedPatterns[$counter] = "{$playlist->name} - ".($rule['name'] ?? 'Unnamed');
-                                        $savedPatternRules[$counter] = $rule;
-                                        $counter++;
-                                    }
-                                }
-                            }
-
-                            return [
-                                Select::make('saved_pattern')
-                                    ->label('Load saved pattern')
-                                    ->searchable()
-                                    ->placeholder('Select a saved pattern...')
-                                    ->options($savedPatterns)
-                                    ->hidden(empty($savedPatterns))
-                                    ->live()
-                                    ->afterStateUpdated(function (?string $state, Set $set) use ($savedPatternRules): void {
-                                        if ($state === null || $state === '') {
-                                            return;
-                                        }
-                                        $rule = $savedPatternRules[(int) $state] ?? null;
-                                        if (! $rule) {
-                                            return;
-                                        }
-                                        $set('use_regex', $rule['use_regex'] ?? true);
-                                        $set('find_replace', $rule['find_replace'] ?? '');
-                                        $set('replace_with', $rule['replace_with'] ?? '');
-                                    })
-                                    ->dehydrated(false),
-                                Toggle::make('use_regex')
-                                    ->label('Use Regex')
-                                    ->live()
-                                    ->helperText('Use regex patterns to find and replace. If disabled, will use direct string comparison.')
-                                    ->default(true),
-                                TextInput::make('find_replace')
-                                    ->label(fn (Get $get) => ! $get('use_regex') ? 'String to replace' : 'Pattern to replace')
-                                    ->required()
-                                    ->placeholder(
-                                        fn (Get $get) => $get('use_regex')
-                                            ? '^(US- |UK- |CA- )'
-                                            : 'US -'
-                                    )->helperText(
-                                        fn (Get $get) => ! $get('use_regex')
-                                            ? 'This is the string you want to find and replace.'
-                                            : 'This is the regex pattern you want to find. Make sure to use valid regex syntax.'
-                                    ),
-                                TextInput::make('replace_with')
-                                    ->label('Replace with (optional)')
-                                    ->placeholder('Leave empty to remove'),
-                            ];
-                        })
+                        ->schema(fn () => FindReplaceService::getBulkActionSchema('vod_groups'))
                         ->action(function (Collection $records, array $data): void {
                             app('Illuminate\Contracts\Bus\Dispatcher')
                                 ->dispatch(new GroupFindAndReplace(
