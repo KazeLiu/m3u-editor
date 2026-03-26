@@ -357,7 +357,6 @@ Current supported index types:
 
 Current capabilities:
 
-- `epg_repair`
 - `epg_processor`
 - `channel_processor`
 - `stream_analysis`

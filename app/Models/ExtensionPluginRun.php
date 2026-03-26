@@ -5,8 +5,8 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class ExtensionPluginRun extends Model
 {
@@ -64,11 +64,6 @@ class ExtensionPluginRun extends Model
     public function logs(): HasMany
     {
         return $this->hasMany(ExtensionPluginRunLog::class)->latest();
-    }
-
-    public function epgRepairCandidates(): HasMany
-    {
-        return $this->hasMany(PluginEpgRepairScanCandidate::class);
     }
 
     public function isStale(int $minutes = 15): bool

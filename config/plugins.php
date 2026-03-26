@@ -100,7 +100,6 @@ return [
     ],
 
     'capabilities' => [
-        'epg_repair' => \App\Plugins\Contracts\EpgRepairPluginInterface::class,
         'epg_processor' => \App\Plugins\Contracts\EpgProcessorPluginInterface::class,
         'channel_processor' => \App\Plugins\Contracts\ChannelProcessorPluginInterface::class,
         'stream_analysis' => \App\Plugins\Contracts\StreamAnalysisPluginInterface::class,
