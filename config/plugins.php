@@ -10,6 +10,8 @@ return [
 
     'install_mode' => env('PLUGIN_INSTALL_MODE', 'normal'),
 
+    'run_retention_days' => (int) env('PLUGIN_RUN_RETENTION_DAYS', 7),
+
     'directories' => [
         base_path('plugins'),
     ],

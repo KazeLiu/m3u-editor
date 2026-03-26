@@ -6,6 +6,7 @@ use App\Filament\Resources\Plugins\PluginResource;
 use App\Models\PluginRun;
 use App\Services\DateFormatService;
 use Filament\Actions\Action;
+use Filament\Actions\BulkAction;
 use Filament\Resources\RelationManagers\RelationManager;
 use Filament\Schemas\Components\Tabs\Tab;
 use Filament\Schemas\Schema;
@@ -17,6 +18,7 @@ use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Arr;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
 
 class RunsRelationManager extends RelationManager
@@ -143,6 +145,23 @@ class RunsRelationManager extends RelationManager
                         'hook' => 'Hook',
                     ]),
             ])
+            ->headerActions([
+                Action::make('clearHistory')
+                    ->label('Clear History')
+                    ->icon('heroicon-o-trash')
+                    ->color('danger')
+                    ->requiresConfirmation()
+                    ->modalHeading('Clear run history')
+                    ->modalDescription('This permanently deletes all completed, failed, cancelled, and stale runs for this plugin. Any currently running jobs are not affected.')
+                    ->modalSubmitActionLabel('Clear history')
+                    ->action(function (): void {
+                        $plugin = $this->getOwnerRecord();
+                        PluginRun::query()
+                            ->where('extension_plugin_id', $plugin->getKey())
+                            ->whereNotIn('status', ['running'])
+                            ->delete();
+                    }),
+            ])
             ->recordActions([
                 Action::make('open')
                     ->label('Open')
@@ -151,6 +170,22 @@ class RunsRelationManager extends RelationManager
                         'record' => $this->getOwnerRecord(),
                         'run' => $record,
                     ])),
+                Action::make('delete')
+                    ->label('Delete')
+                    ->icon('heroicon-o-trash')
+                    ->color('danger')
+                    ->requiresConfirmation()
+                    ->disabled(fn (PluginRun $record): bool => $record->status === 'running')
+                    ->action(fn (PluginRun $record) => $record->delete()),
+            ])
+            ->bulkActions([
+                BulkAction::make('delete')
+                    ->label('Delete selected')
+                    ->icon('heroicon-o-trash')
+                    ->color('danger')
+                    ->requiresConfirmation()
+                    ->deselectRecordsAfterCompletion()
+                    ->action(fn (Collection $records) => $records->each->delete()),
             ]);
     }
 

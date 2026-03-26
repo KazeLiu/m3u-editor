@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\MassPrunable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -11,6 +12,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 class PluginRun extends Model
 {
     use HasFactory;
+    use MassPrunable;
 
     protected $table = 'extension_plugin_runs';
 
@@ -52,6 +54,15 @@ class PluginRun extends Model
         'cancelled_at' => 'datetime',
         'stale_at' => 'datetime',
     ];
+
+    public function prunable(): Builder
+    {
+        $days = (int) config('plugins.run_retention_days', 30);
+
+        return static::query()
+            ->whereNotIn('status', ['running'])
+            ->where('created_at', '<', now()->subDays($days));
+    }
 
     public function plugin(): BelongsTo
     {

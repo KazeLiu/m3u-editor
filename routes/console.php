@@ -1,5 +1,6 @@
 <?php
 
+use App\Models\PluginRun;
 use Illuminate\Support\Facades\Schedule;
 
 /*
@@ -50,6 +51,10 @@ Schedule::command('queue:prune-failed --hours=48')
 
 // Prune old notifications
 Schedule::command('app:prune-old-notifications --days=7')
+    ->daily();
+
+// Prune old plugin run history (retention configured via PLUGIN_RUN_RETENTION_DAYS, default 7 days)
+Schedule::command('model:prune', ['--model' => [PluginRun::class]])
     ->daily();
 
 // Ensure m3u-proxy webhook is registered (handles proxy restarts, delayed startup, etc.)
