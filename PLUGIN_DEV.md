@@ -82,21 +82,21 @@ Example:
 
 ```json
 {
-  "id": "epg-repair",
-  "name": "EPG Repair",
+  "id": "sample-plugin",
+  "name": "Sample Plugin",
   "version": "1.0.0",
   "api_version": "1.0.0",
-  "description": "Scans channels for missing or empty EPG mappings.",
+  "description": "Demonstrates a reviewed plugin install with one health check action.",
   "entrypoint": "Plugin.php",
-  "class": "AppLocalPlugins\\EpgRepair\\Plugin",
-  "capabilities": ["epg_repair", "scheduled"],
-  "hooks": ["epg.cache.generated"],
-  "permissions": ["db_read", "queue_jobs", "hook_subscriptions", "scheduled_runs"],
+  "class": "AppLocalPlugins\\SamplePlugin\\Plugin",
+  "capabilities": ["scheduled"],
+  "hooks": [],
+  "permissions": ["queue_jobs", "scheduled_runs"],
   "schema": {
     "tables": []
   },
   "data_ownership": {
-    "directories": ["plugin-reports/epg-repair"],
+    "directories": ["plugin-reports/sample-plugin"],
     "default_cleanup_policy": "preserve"
   },
   "settings": [],
@@ -276,10 +276,10 @@ Plugin-owned tables must start with:
 plugin_<plugin_id_with_dashes_replaced_by_underscores>_
 ```
 
-Example for `epg-repair`:
+Example for `sample-plugin`:
 
 ```text
-plugin_epg_repair_scan_candidates
+plugin_sample_plugin_events
 ```
 
 ### Storage path rules
@@ -293,15 +293,15 @@ Current approved roots:
 
 Examples:
 
-- `plugin-reports/epg-repair`
-- `plugin-data/epg-repair/cache/state.json`
+- `plugin-reports/sample-plugin`
+- `plugin-data/sample-plugin/cache/state.json`
 
 Invalid examples:
 
-- `/tmp/epg-repair`
-- `storage/app/plugin-reports/epg-repair`
+- `/tmp/sample-plugin`
+- `storage/app/plugin-reports/sample-plugin`
 - `plugin-reports/shared`
-- `../reports/epg-repair`
+- `../reports/sample-plugin`
 
 The host uses these declarations during uninstall so it can safely preserve or purge plugin-owned artifacts without guessing.
 
@@ -413,7 +413,7 @@ Supported schema field types:
 
 - `php artisan plugins:discover`
 - `php artisan plugins:validate`
-- `php artisan plugins:validate epg-repair`
+- `php artisan plugins:validate <plugin-id>`
 - `php artisan plugins:stage-directory <path>`
 - `php artisan plugins:stage-archive <archive>`
 - `php artisan plugins:stage-github-release <url> --sha256=<hash>`
@@ -422,13 +422,13 @@ Supported schema field types:
 - `php artisan plugins:reject-install <review-id>`
 - `php artisan plugins:discard-install <review-id>`
 - `php artisan plugins:verify-integrity`
-- `php artisan plugins:trust epg-repair`
-- `php artisan plugins:block epg-repair`
+- `php artisan plugins:trust <plugin-id>`
+- `php artisan plugins:block <plugin-id>`
 - `php artisan make:plugin "Acme XML Tools"`
 - `php artisan plugins:doctor`
-- `php artisan plugins:uninstall epg-repair --cleanup=preserve`
-- `php artisan plugins:reinstall epg-repair`
-- `php artisan plugins:forget epg-repair`
+- `php artisan plugins:uninstall <plugin-id> --cleanup=preserve`
+- `php artisan plugins:reinstall <plugin-id>`
+- `php artisan plugins:forget <plugin-id>`
 - `php artisan plugins:run-scheduled`
 
 ## Host Operations
@@ -518,15 +518,15 @@ php artisan plugins:approve-install <review-id> --trust
 - Untrusted or integrity-changed plugins cannot execute until they are reviewed again
 - Uninstall cleanup only touches plugin-owned data declared in the manifest
 
-## Reference Plugin
+## Sample Plugin
 
-This fork includes `plugins/epg-repair`.
+Use `php artisan make:plugin "Acme XML Tools"` to generate a sample plugin repo skeleton.
 
-It demonstrates:
+The generated starter kit demonstrates:
 
 - manifest-driven registration
-- dynamic settings/actions
-- queued execution
-- hook subscription
+- reviewed install packaging
+- CI-ready release workflow
+- optional AI helper files for plugin-author repos
 - scheduled invocation
 - dry-run versus apply behavior

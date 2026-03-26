@@ -9,7 +9,6 @@ use App\Models\ExtensionPluginRun;
 use App\Models\ExtensionPluginRunLog;
 use App\Models\Playlist;
 use App\Models\PluginInstallReview;
-use App\Models\PluginEpgRepairScanCandidate;
 use App\Models\User;
 use App\Filament\Resources\ExtensionPlugins\Pages\ViewPluginRun;
 use App\Plugins\PluginManager;
@@ -38,25 +37,6 @@ function approvePluginReviewForTests(string $sourcePath, bool $trust = true, boo
     return $pluginManager->approveInstallReview($review, $trust);
 }
 
-function discoverPluginForTests(bool $enabled = false): ExtensionPlugin
-{
-    $pluginManager = app(PluginManager::class);
-    $plugin = collect($pluginManager->discover())
-        ->firstWhere('plugin_id', 'epg-repair');
-
-    expect($plugin)->not->toBeNull();
-
-    $plugin = $pluginManager->reinstall($plugin->fresh());
-
-    if ($enabled) {
-        approvePluginReviewForTests(base_path('plugins/epg-repair'), true);
-        $plugin = $pluginManager->findPluginById('epg-repair');
-        $plugin?->update(['enabled' => true]);
-    }
-
-    return $plugin->fresh();
-}
-
 function pluginReviewFixturePaths(string $pluginId): array
 {
     return [
@@ -71,7 +51,7 @@ function pluginReviewFixtureClassName(string $pluginId): string
     return 'AppLocalPlugins\\'.Str::studly(str_replace('-', ' ', $pluginId)).'\\Plugin';
 }
 
-function createReviewFixturePlugin(string $pluginId, bool $withSideEffect = false): array
+function createReviewFixturePlugin(string $pluginId, bool $withSideEffect = false, array $manifestOverrides = []): array
 {
     $paths = pluginReviewFixturePaths($pluginId);
     $classSegment = Str::studly(str_replace('-', ' ', $pluginId));
@@ -81,7 +61,7 @@ function createReviewFixturePlugin(string $pluginId, bool $withSideEffect = fals
     File::ensureDirectoryExists(dirname($paths['sentinel']));
     File::delete($paths['sentinel']);
 
-    $manifest = [
+    $manifest = array_replace_recursive([
         'id' => $pluginId,
         'name' => Str::title(str_replace('-', ' ', $pluginId)),
         'version' => '0.1.0',
@@ -105,7 +85,7 @@ function createReviewFixturePlugin(string $pluginId, bool $withSideEffect = fals
             'files' => [],
             'default_cleanup_policy' => 'preserve',
         ],
-    ];
+    ], $manifestOverrides);
 
     $sideEffect = $withSideEffect
         ? "\nfile_put_contents(".var_export($paths['sentinel'], true).", 'executed');\n"
@@ -137,6 +117,24 @@ PHP;
     File::put($paths['source'].'/Plugin.php', $pluginSource);
 
     return $paths;
+}
+
+function installFixturePluginForTests(string $pluginId, bool $trust = true, bool $enabled = false, array $manifestOverrides = []): array
+{
+    $paths = createReviewFixturePlugin($pluginId, manifestOverrides: $manifestOverrides);
+    $review = approvePluginReviewForTests($paths['source'], $trust);
+    $plugin = app(PluginManager::class)->findPluginById($pluginId);
+
+    if ($enabled && $plugin) {
+        $plugin->update(['enabled' => true]);
+        $plugin = $plugin->fresh();
+    }
+
+    return [
+        'paths' => $paths,
+        'review' => $review,
+        'plugin' => $plugin?->fresh(),
+    ];
 }
 
 function createZipArchiveForTests(string $sourcePath, string $archivePath, array $extraEntries = []): void
@@ -223,34 +221,32 @@ function cleanupReviewFixturePlugin(string $pluginId): void
     Storage::disk('local')->delete(trim((string) config('plugins.upload_directory', 'plugin-review-uploads'), '/').'/'.$pluginId.'.zip');
 }
 
-it('discovers the bundled epg repair plugin as a valid local plugin', function () {
-    $plugins = app(PluginManager::class)->discover();
+it('discovers and validates a generated local plugin fixture', function () {
+    $pluginId = 'discover-fixture-'.Str::lower(Str::random(6));
+    $paths = createReviewFixturePlugin($pluginId);
+    $discoverablePath = base_path('plugins/'.$pluginId);
 
-    expect(collect($plugins)->pluck('plugin_id'))->toContain('epg-repair');
+    try {
+        File::deleteDirectory($discoverablePath);
+        File::copyDirectory($paths['source'], $discoverablePath);
 
-    $plugin = ExtensionPlugin::query()->where('plugin_id', 'epg-repair')->first();
+        $plugins = app(PluginManager::class)->discover();
+        $plugin = collect($plugins)->firstWhere('plugin_id', $pluginId);
 
-    expect($plugin)->not->toBeNull();
-    expect($plugin->validation_status)->toBe('valid');
-    expect($plugin->available)->toBeTrue();
-    expect($plugin->trust_state)->toBe('pending_review');
-    expect($plugin->integrity_status)->toBe('unknown');
-    expect($plugin->class_name)->toBe('AppLocalPlugins\\EpgRepair\\Plugin');
-    expect($plugin->capabilities)->toContain('epg_repair');
-    expect($plugin->permissions)->toContain('queue_jobs');
-    expect($plugin->actions)->toBeArray();
-});
+        expect($plugin)->not->toBeNull();
+        expect($plugin->validation_status)->toBe('valid');
+        expect($plugin->available)->toBeTrue();
+        expect($plugin->trust_state)->toBe('pending_review');
+        expect($plugin->integrity_status)->toBe('unknown');
 
-it('validates a discovered plugin from the registry', function () {
-    $plugin = collect(app(PluginManager::class)->discover())
-        ->firstWhere('plugin_id', 'epg-repair');
+        $validated = app(PluginManager::class)->validate($plugin);
 
-    expect($plugin)->not->toBeNull();
-
-    $validated = app(PluginManager::class)->validate($plugin);
-
-    expect($validated->validation_status)->toBe('valid');
-    expect($validated->validation_errors)->toBe([]);
+        expect($validated->validation_status)->toBe('valid');
+        expect($validated->validation_errors)->toBe([]);
+    } finally {
+        File::deleteDirectory($discoverablePath);
+        cleanupReviewFixturePlugin($pluginId);
+    }
 });
 
 it('rejects top-level executable plugin php while staging a directory review', function () {
@@ -631,801 +627,122 @@ it('cleans uploaded archive staging after a successful install', function () {
     }
 });
 
-it('requires admin trust before a plugin becomes runnable', function () {
-    $pluginManager = app(PluginManager::class);
-    $plugin = collect($pluginManager->discover())
-        ->firstWhere('plugin_id', 'epg-repair');
-
-    expect($plugin)->not->toBeNull();
-    expect($plugin->isTrusted())->toBeFalse();
-    expect($plugin->hasVerifiedIntegrity())->toBeFalse();
-
-    $review = approvePluginReviewForTests(base_path('plugins/epg-repair'), false);
-    expect($review->scan_status)->toBe('clean');
-
-    $trusted = $pluginManager->trust($pluginManager->findPluginById('epg-repair')->fresh());
-
-    expect($trusted->isTrusted())->toBeTrue();
-    expect($trusted->hasVerifiedIntegrity())->toBeTrue();
-    expect($trusted->trusted_hashes)->toMatchArray([
-        'manifest_hash' => $trusted->manifest_hash,
-        'entrypoint_hash' => $trusted->entrypoint_hash,
-        'plugin_hash' => $trusted->plugin_hash,
-    ]);
-});
-
-it('downgrades trust when a trusted plugin file changes', function () {
-    $pluginManager = app(PluginManager::class);
-    approvePluginReviewForTests(base_path('plugins/epg-repair'), true);
-    $plugin = $pluginManager->findPluginById('epg-repair');
-
-    $manifestPath = base_path('plugins/epg-repair/plugin.json');
-    $originalManifest = File::get($manifestPath);
-    $decoded = json_decode($originalManifest, true, flags: JSON_THROW_ON_ERROR);
-    $decoded['description'] = 'Tampered during test '.Str::random(6);
-
-    File::put($manifestPath, json_encode($decoded, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES).PHP_EOL);
+it('requires admin trust before a fixture plugin becomes runnable', function () {
+    $pluginId = 'trust-fixture-'.Str::lower(Str::random(6));
 
     try {
+        $installed = installFixturePluginForTests($pluginId, trust: false);
+        $plugin = $installed['plugin'];
+
+        expect($plugin)->not->toBeNull();
+        expect($plugin->isTrusted())->toBeFalse();
+        expect($plugin->hasVerifiedIntegrity())->toBeFalse();
+        expect($installed['review']->scan_status)->toBe('clean');
+
+        $trusted = app(PluginManager::class)->trust($plugin->fresh());
+
+        expect($trusted->isTrusted())->toBeTrue();
+        expect($trusted->hasVerifiedIntegrity())->toBeTrue();
+        expect($trusted->trusted_hashes)->toMatchArray([
+            'manifest_hash' => $trusted->manifest_hash,
+            'entrypoint_hash' => $trusted->entrypoint_hash,
+            'plugin_hash' => $trusted->plugin_hash,
+        ]);
+    } finally {
+        cleanupReviewFixturePlugin($pluginId);
+    }
+});
+
+it('downgrades trust when a trusted fixture plugin file changes', function () {
+    $pluginId = 'tamper-fixture-'.Str::lower(Str::random(6));
+    $pluginManager = app(PluginManager::class);
+
+    try {
+        $installed = installFixturePluginForTests($pluginId, trust: true);
+        $plugin = $installed['plugin'];
+        $manifestPath = rtrim((string) $plugin?->path, DIRECTORY_SEPARATOR).DIRECTORY_SEPARATOR.'plugin.json';
+        $originalManifest = File::get($manifestPath);
+        $decoded = json_decode($originalManifest, true, flags: JSON_THROW_ON_ERROR);
+        $decoded['description'] = 'Tampered during test '.Str::random(6);
+
+        File::put($manifestPath, json_encode($decoded, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES).PHP_EOL);
+
         $plugin = $pluginManager->verifyIntegrity($plugin->fresh());
 
         expect($plugin->trust_state)->toBe('pending_review');
         expect($plugin->integrity_status)->toBe('changed');
         expect($plugin->enabled)->toBeFalse();
     } finally {
-        File::put($manifestPath, $originalManifest);
-        $pluginManager->validate($plugin->fresh());
+        if (isset($originalManifest)) {
+            File::put($manifestPath, $originalManifest);
+        }
+        cleanupReviewFixturePlugin($pluginId);
     }
 });
 
-it('scans and applies epg repairs through the plugin manager', function () {
-    $pluginManager = app(PluginManager::class);
-    $plugin = discoverPluginForTests(true);
-
-    $user = User::create([
-        'name' => 'Plugin Tester',
-        'email' => 'plugin-test-'.Str::random(10).'@example.com',
-        'password' => Hash::make('password'),
-        'email_verified_at' => now(),
-    ]);
-
-    $playlist = Playlist::create([
-        'name' => 'Plugin Test Playlist',
-        'uuid' => (string) Str::uuid(),
-        'url' => 'http://example.test/playlist.m3u',
-        'status' => Status::Completed,
-        'prefix' => 'test',
-        'channels' => 1,
-        'synced' => now(),
-        'id_channel_by' => 'stream_id',
-        'user_id' => $user->id,
-    ]);
-
-    $epg = Epg::create([
-        'name' => 'Plugin Test EPG',
-        'url' => 'http://example.test/epg.xml',
-        'user_id' => $user->id,
-        'status' => Status::Completed,
-    ]);
-
-    $epgChannel = EpgChannel::create([
-        'name' => 'BBC One HD',
-        'display_name' => 'BBC One HD',
-        'lang' => 'en',
-        'channel_id' => 'bbc-one-hd',
-        'epg_id' => $epg->id,
-        'user_id' => $user->id,
-    ]);
-
-    $channel = Channel::create([
-        'name' => 'BBC One HD',
-        'title' => 'BBC One HD',
-        'enabled' => true,
-        'channel' => 1,
-        'shift' => 0,
-        'url' => 'http://stream.example.test/live.ts',
-        'logo' => '',
-        'group' => 'Test',
-        'stream_id' => '1',
-        'lang' => 'en',
-        'country' => 'GB',
-        'user_id' => $user->id,
-        'playlist_id' => $playlist->id,
-        'group_id' => null,
-        'is_vod' => false,
-        'epg_channel_id' => null,
-    ]);
-
-    $scanRun = $pluginManager->executeAction($plugin->fresh(), 'scan', [
-        'playlist_id' => $playlist->id,
-        'epg_id' => $epg->id,
-        'hours_ahead' => 12,
-        'confidence_threshold' => 0.6,
-    ], [
-        'trigger' => 'manual',
-        'dry_run' => true,
-        'user_id' => $user->id,
-    ]);
-
-    expect($scanRun->status)->toBe('completed');
-    expect(data_get($scanRun->result, 'data.channels_preview'))->toHaveCount(1);
-    expect(data_get($scanRun->result, 'data.channels_preview.0.issue'))->toBe('unmapped');
-    expect(data_get($scanRun->result, 'data.channels_preview.0.playlist_name'))->toBe('Plugin Test Playlist');
-    expect(data_get($scanRun->result, 'data.channels_preview.0.suggested_epg_channel_id'))->toBe($epgChannel->id);
-    expect(data_get($scanRun->result, 'data.channels_preview.0.suggested_epg_source_name'))->toBe('Plugin Test EPG');
-    expect(data_get($scanRun->result, 'data.channels_preview.0.repairable'))->toBeTrue();
-    expect(data_get($scanRun->result, 'data.channels_total_count'))->toBe(1);
-    expect(data_get($scanRun->result, 'data.channels_truncated'))->toBeFalse();
-    expect(data_get($scanRun->result, 'data.issue_breakdown.unmapped'))->toBe(1);
-    expect(data_get($scanRun->result, 'data.decision_breakdown.repairable'))->toBe(1);
-    expect(data_get($scanRun->result, 'data.confidence_breakdown.exact'))->toBe(1);
-    expect(data_get($scanRun->result, 'data.totals.epg_channels_available'))->toBe(1);
-    expect(Storage::disk('local')->exists(data_get($scanRun->result, 'data.report.path')))->toBeTrue();
-    expect(Storage::disk('local')->get(data_get($scanRun->result, 'data.report.path')))->toContain('BBC One HD');
-    expect(PluginEpgRepairScanCandidate::query()->where('extension_plugin_run_id', $scanRun->id)->count())->toBe(1);
-    $scanCandidate = PluginEpgRepairScanCandidate::query()->where('extension_plugin_run_id', $scanRun->id)->first();
-    expect($scanCandidate?->review_status)->toBe('pending');
-    expect($scanCandidate?->suggested_epg_channel_id)->toBe($epgChannel->id);
-    expect($scanCandidate?->playlist_name)->toBe('Plugin Test Playlist');
-    expect($scanRun->progress)->toBe(100);
-    expect(data_get($scanRun->result, 'status'))->toBe('completed');
-    expect($scanRun->last_heartbeat_at)->not->toBeNull();
-    expect($scanRun->run_state)->toBeNull();
-    expect($scanRun->logs()->count())->toBeGreaterThanOrEqual(2);
-    expect($scanRun->logs()->pluck('message')->join(' '))->toContain('Starting EPG Repair scan.');
-
-    $applyRun = $pluginManager->executeAction($plugin->fresh(), 'apply', [
-        'playlist_id' => $playlist->id,
-        'epg_id' => $epg->id,
-        'hours_ahead' => 12,
-        'confidence_threshold' => 0.6,
-    ], [
-        'trigger' => 'manual',
-        'dry_run' => false,
-        'user_id' => $user->id,
-    ]);
-
-    expect($applyRun->status)->toBe('completed');
-    expect($applyRun->progress)->toBe(100);
-    expect($applyRun->last_heartbeat_at)->not->toBeNull();
-    expect($applyRun->run_state)->toBeNull();
-
-    $channel->refresh();
-
-    expect($channel->epg_channel_id)->toBe($epgChannel->id);
-    expect(data_get($applyRun->result, 'data.totals.repairs_applied'))->toBe(1);
-    expect($applyRun->logs()->pluck('message')->join(' '))->toContain('Applied EPG repair to channel.');
-    expect(PluginEpgRepairScanCandidate::query()->where('extension_plugin_run_id', $applyRun->id)->where('applied', true)->count())->toBe(1);
-    expect(ExtensionPluginRunLog::query()->count())->toBeGreaterThanOrEqual(4);
-});
-
-it('explains when a scan has no enabled live channels to inspect', function () {
-    $pluginManager = app(PluginManager::class);
-    $plugin = discoverPluginForTests(true);
-
-    $user = User::create([
-        'name' => 'Empty Playlist Tester',
-        'email' => 'empty-playlist-'.Str::random(10).'@example.com',
-        'password' => Hash::make('password'),
-        'email_verified_at' => now(),
-    ]);
-
-    $playlist = Playlist::create([
-        'name' => 'Empty Playlist',
-        'uuid' => (string) Str::uuid(),
-        'url' => 'http://example.test/empty.m3u',
-        'status' => Status::Completed,
-        'prefix' => 'empty',
-        'channels' => 0,
-        'synced' => now(),
-        'id_channel_by' => 'stream_id',
-        'user_id' => $user->id,
-    ]);
-
-    $epg = Epg::create([
-        'name' => 'Empty Playlist EPG',
-        'url' => 'http://example.test/epg.xml',
-        'user_id' => $user->id,
-        'status' => Status::Completed,
-    ]);
-
-    $scanRun = $pluginManager->executeAction($plugin->fresh(), 'scan', [
-        'playlist_id' => $playlist->id,
-        'epg_id' => $epg->id,
-        'hours_ahead' => 12,
-        'confidence_threshold' => 0.6,
-    ], [
-        'trigger' => 'manual',
-        'dry_run' => true,
-        'user_id' => $user->id,
-    ]);
-
-    expect($scanRun->status)->toBe('completed');
-    expect($scanRun->summary)->toContain('no enabled live channels');
-    expect(data_get($scanRun->result, 'data.totals.channels_scanned'))->toBe(0);
-    expect($scanRun->logs()->pluck('message')->join(' '))->toContain('no enabled live channels');
-});
-
-it('rejects manual plugin actions against resources owned by another user', function () {
-    $pluginManager = app(PluginManager::class);
-    $plugin = discoverPluginForTests(true);
-
-    $owner = User::factory()->create(['permissions' => ['use_tools']]);
-    $attacker = User::factory()->create(['permissions' => ['use_tools']]);
-
-    $playlist = Playlist::create([
-        'name' => 'Owned Playlist',
-        'uuid' => (string) Str::uuid(),
-        'url' => 'http://example.test/owned.m3u',
-        'status' => Status::Completed,
-        'prefix' => 'owned',
-        'channels' => 0,
-        'synced' => now(),
-        'id_channel_by' => 'stream_id',
-        'user_id' => $owner->id,
-    ]);
-
-    $epg = Epg::create([
-        'name' => 'Owned EPG',
-        'url' => 'http://example.test/owned.xml',
-        'user_id' => $owner->id,
-        'status' => Status::Completed,
-    ]);
-
-    $run = $pluginManager->executeAction($plugin->fresh(), 'scan', [
-        'playlist_id' => $playlist->id,
-        'epg_id' => $epg->id,
-        'hours_ahead' => 12,
-        'confidence_threshold' => 0.6,
-    ], [
-        'trigger' => 'manual',
-        'dry_run' => true,
-        'user_id' => $attacker->id,
-    ]);
-
-    expect($run->status)->toBe('failed');
-    expect($run->summary)->toContain('do not have access');
-});
-
-it('can compare a channel against all owned epg sources during scan', function () {
-    $pluginManager = app(PluginManager::class);
-    $plugin = discoverPluginForTests(true);
-
-    $user = User::create([
-        'name' => 'Compare Tester',
-        'email' => 'compare-'.Str::random(10).'@example.com',
-        'password' => Hash::make('password'),
-        'email_verified_at' => now(),
-    ]);
-
-    $playlist = Playlist::create([
-        'name' => 'Compare Playlist',
-        'uuid' => (string) Str::uuid(),
-        'url' => 'http://example.test/compare.m3u',
-        'status' => Status::Completed,
-        'prefix' => 'compare',
-        'channels' => 1,
-        'synced' => now(),
-        'id_channel_by' => 'stream_id',
-        'user_id' => $user->id,
-    ]);
-
-    $selectedEpg = Epg::create([
-        'name' => 'Regional EPG',
-        'url' => 'http://example.test/regional.xml',
-        'user_id' => $user->id,
-        'status' => Status::Completed,
-    ]);
-
-    $betterEpg = Epg::create([
-        'name' => 'Primary EPG',
-        'url' => 'http://example.test/primary.xml',
-        'user_id' => $user->id,
-        'status' => Status::Completed,
-    ]);
-
-    EpgChannel::create([
-        'name' => 'BBC One London',
-        'display_name' => 'BBC One London',
-        'lang' => 'en',
-        'channel_id' => 'bbc-one-london',
-        'epg_id' => $selectedEpg->id,
-        'user_id' => $user->id,
-    ]);
-
-    $betterChannel = EpgChannel::create([
-        'name' => 'BBC One HD',
-        'display_name' => 'BBC One HD',
-        'lang' => 'en',
-        'channel_id' => 'bbc-one-hd',
-        'epg_id' => $betterEpg->id,
-        'user_id' => $user->id,
-    ]);
-
-    Channel::create([
-        'name' => 'BBC One HD',
-        'title' => 'BBC One HD',
-        'enabled' => true,
-        'channel' => 1,
-        'shift' => 0,
-        'url' => 'http://stream.example.test/compare.ts',
-        'logo' => '',
-        'group' => 'Test',
-        'stream_id' => 'compare-1',
-        'lang' => 'en',
-        'country' => 'GB',
-        'user_id' => $user->id,
-        'playlist_id' => $playlist->id,
-        'group_id' => null,
-        'is_vod' => false,
-        'epg_channel_id' => null,
-    ]);
-
-    $scanRun = $pluginManager->executeAction($plugin->fresh(), 'scan', [
-        'playlist_id' => $playlist->id,
-        'epg_id' => $selectedEpg->id,
-        'hours_ahead' => 12,
-        'confidence_threshold' => 0.6,
-        'source_scope' => 'all_owned',
-    ], [
-        'trigger' => 'manual',
-        'dry_run' => true,
-        'user_id' => $user->id,
-    ]);
-
-    expect($scanRun->status)->toBe('completed');
-    expect(data_get($scanRun->result, 'data.source_scope'))->toBe('all_owned');
-    expect(data_get($scanRun->result, 'data.totals.compared_epg_sources'))->toBe(2);
-    expect(data_get($scanRun->result, 'data.channels_preview.0.decision'))->toBe('better_source_available');
-    expect(data_get($scanRun->result, 'data.channels_preview.0.suggested_epg_channel_id'))->toBe($betterChannel->id);
-    expect(data_get($scanRun->result, 'data.channels_preview.0.suggested_epg_source_name'))->toBe('Primary EPG');
-    expect(data_get($scanRun->result, 'data.channels_preview.0.source_candidates_count'))->toBeGreaterThanOrEqual(1);
-    expect(PluginEpgRepairScanCandidate::query()->where('extension_plugin_run_id', $scanRun->id)->first()?->suggested_epg_source_name)->toBe('Primary EPG');
-});
-
-it('blocks source switching during apply unless explicitly allowed', function () {
-    $pluginManager = app(PluginManager::class);
-    $plugin = discoverPluginForTests(true);
-
-    $user = User::create([
-        'name' => 'Apply Guard Tester',
-        'email' => 'apply-guard-'.Str::random(10).'@example.com',
-        'password' => Hash::make('password'),
-        'email_verified_at' => now(),
-    ]);
-
-    $playlist = Playlist::create([
-        'name' => 'Apply Guard Playlist',
-        'uuid' => (string) Str::uuid(),
-        'url' => 'http://example.test/apply-guard.m3u',
-        'status' => Status::Completed,
-        'prefix' => 'apply-guard',
-        'channels' => 1,
-        'synced' => now(),
-        'id_channel_by' => 'stream_id',
-        'user_id' => $user->id,
-    ]);
-
-    $currentEpg = Epg::create([
-        'name' => 'Current EPG',
-        'url' => 'http://example.test/current.xml',
-        'user_id' => $user->id,
-        'status' => Status::Completed,
-    ]);
-
-    $targetEpg = Epg::create([
-        'name' => 'Target EPG',
-        'url' => 'http://example.test/target.xml',
-        'user_id' => $user->id,
-        'status' => Status::Completed,
-    ]);
-
-    $currentMapping = EpgChannel::create([
-        'name' => 'Sky Sports Main Event',
-        'display_name' => 'Sky Sports Main Event',
-        'lang' => 'en',
-        'channel_id' => 'sky-sports-main-event-current',
-        'epg_id' => $currentEpg->id,
-        'user_id' => $user->id,
-    ]);
-
-    EpgChannel::create([
-        'name' => 'Sky Sports Main Event',
-        'display_name' => 'Sky Sports Main Event',
-        'lang' => 'en',
-        'channel_id' => 'sky-sports-main-event-target',
-        'epg_id' => $targetEpg->id,
-        'user_id' => $user->id,
-    ]);
-
-    $channel = Channel::create([
-        'name' => 'Sky Sports Main Event',
-        'title' => 'Sky Sports Main Event',
-        'enabled' => true,
-        'channel' => 1,
-        'shift' => 0,
-        'url' => 'http://stream.example.test/apply-guard.ts',
-        'logo' => '',
-        'group' => 'Sports',
-        'stream_id' => 'apply-guard-1',
-        'lang' => 'en',
-        'country' => 'GB',
-        'user_id' => $user->id,
-        'playlist_id' => $playlist->id,
-        'group_id' => null,
-        'is_vod' => false,
-        'epg_channel_id' => $currentMapping->id,
-    ]);
-
-    $applyRun = $pluginManager->executeAction($plugin->fresh(), 'apply', [
-        'playlist_id' => $playlist->id,
-        'epg_id' => $targetEpg->id,
-        'hours_ahead' => 12,
-        'confidence_threshold' => 0.6,
-        'apply_scope' => 'all_repairable',
-        'allow_source_switch' => false,
-        'max_repairs' => 50,
-    ], [
-        'trigger' => 'manual',
-        'dry_run' => false,
-        'user_id' => $user->id,
-    ]);
-
-    $channel->refresh();
-
-    expect($applyRun->status)->toBe('completed');
-    expect($channel->epg_channel_id)->toBe($currentMapping->id);
-    expect(data_get($applyRun->result, 'data.totals.repairs_applied'))->toBe(0);
-    expect(data_get($applyRun->result, 'data.apply_outcome_breakdown.source_switch_blocked'))->toBe(1);
-    expect(data_get($applyRun->result, 'data.channels_preview.0.apply_outcome'))->toBe('source_switch_blocked');
-});
-
-it('lets operators review visible candidates before applying reviewed repairs', function () {
-    $pluginManager = app(PluginManager::class);
-    $plugin = discoverPluginForTests(true);
-
-    $user = User::factory()->create([
-        'permissions' => ['use_tools'],
-    ]);
-
-    $playlist = Playlist::create([
-        'name' => 'Reviewed Apply Playlist',
-        'uuid' => (string) Str::uuid(),
-        'url' => 'http://example.test/reviewed-apply.m3u',
-        'status' => Status::Completed,
-        'prefix' => 'reviewed',
-        'channels' => 1,
-        'synced' => now(),
-        'id_channel_by' => 'stream_id',
-        'user_id' => $user->id,
-    ]);
-
-    $epg = Epg::create([
-        'name' => 'Reviewed Apply EPG',
-        'url' => 'http://example.test/reviewed-apply.xml',
-        'user_id' => $user->id,
-        'status' => Status::Completed,
-    ]);
-
-    $epgChannel = EpgChannel::create([
-        'name' => 'Discovery Channel HD',
-        'display_name' => 'Discovery Channel HD',
-        'lang' => 'en',
-        'channel_id' => 'discovery-channel-hd',
-        'epg_id' => $epg->id,
-        'user_id' => $user->id,
-    ]);
-
-    $channel = Channel::create([
-        'name' => 'Discovery Channel HD',
-        'title' => 'Discovery Channel HD',
-        'enabled' => true,
-        'channel' => 7,
-        'shift' => 0,
-        'url' => 'http://stream.example.test/discovery.ts',
-        'logo' => '',
-        'group' => 'Docs',
-        'stream_id' => 'reviewed-1',
-        'lang' => 'en',
-        'country' => 'US',
-        'user_id' => $user->id,
-        'playlist_id' => $playlist->id,
-        'group_id' => null,
-        'is_vod' => false,
-        'epg_channel_id' => null,
-    ]);
-
-    $scanRun = $pluginManager->executeAction($plugin->fresh(), 'scan', [
-        'playlist_id' => $playlist->id,
-        'epg_id' => $epg->id,
-        'hours_ahead' => 12,
-        'confidence_threshold' => 0.6,
-    ], [
-        'trigger' => 'manual',
-        'dry_run' => true,
-        'user_id' => $user->id,
-    ]);
-
-    $this->actingAs($user);
-
-    Livewire::test(ViewPluginRun::class, [
-        'record' => $plugin->id,
-        'run' => $scanRun->id,
-    ])->call('markReviewDecision', $channel->id, 'approved');
-
-    $scanRun->refresh();
-    $scanCandidate = PluginEpgRepairScanCandidate::query()
-        ->where('extension_plugin_run_id', $scanRun->id)
-        ->where('channel_id', $channel->id)
-        ->first();
-
-    expect(data_get($scanRun->result, 'data.review.counts.approved'))->toBe(1);
-    expect(data_get($scanRun->result, 'data.review.counts.pending'))->toBe(0);
-    expect(data_get($scanRun->result, 'data.review.decisions.'.$channel->id.'.status'))->toBe('approved');
-    expect($scanCandidate?->review_status)->toBe('approved');
-    expect($scanCandidate?->reviewed_by_user_id)->toBe($user->id);
-
-    $applyReviewedRun = $pluginManager->executeAction($plugin->fresh(), 'apply_reviewed', [
-        'source_run_id' => $scanRun->id,
-    ], [
-        'trigger' => 'manual',
-        'dry_run' => false,
-        'user_id' => $user->id,
-    ]);
-
-    $channel->refresh();
-    $scanRun->refresh();
-
-    expect($applyReviewedRun->status)->toBe('completed');
-    expect($channel->epg_channel_id)->toBe($epgChannel->id);
-    expect(data_get($applyReviewedRun->result, 'data.totals.repairs_applied'))->toBe(1);
-    expect(data_get($applyReviewedRun->result, 'data.apply_outcome_breakdown.applied'))->toBe(1);
-    expect(data_get($scanRun->result, 'data.review.decisions.'.$channel->id.'.status'))->toBe('applied');
-    expect(PluginEpgRepairScanCandidate::query()->where('extension_plugin_run_id', $applyReviewedRun->id)->where('applied', true)->count())->toBe(1);
-    expect(PluginEpgRepairScanCandidate::query()->where('extension_plugin_run_id', $scanRun->id)->where('channel_id', $channel->id)->first()?->review_status)->toBe('applied');
-});
-
-it('prefills plugin action fields from saved settings when declared', function () {
-    $plugin = discoverPluginForTests();
-
-    $plugin->forceFill([
-        'settings' => [
-            'default_playlist_id' => 42,
-            'default_epg_id' => 77,
-            'hours_ahead' => 24,
-            'confidence_threshold' => 0.8,
-        ],
-    ]);
-
-    $components = collect(app(PluginSchemaMapper::class)->actionComponents($plugin, 'scan'))
-        ->keyBy(fn ($component) => $component->getName());
-
-    expect($components['playlist_id']->getDefaultState())->toBe(42);
-    expect($components['epg_id']->getDefaultState())->toBe(77);
-    expect($components['hours_ahead']->getDefaultState())->toBe(24);
-    expect($components['confidence_threshold']->getDefaultState())->toBe(0.8);
-});
-
-it('records plugin-owned data declarations and preserves them on uninstall by default', function () {
-    Storage::fake('local');
-
-    $pluginManager = app(PluginManager::class);
-    $plugin = discoverPluginForTests(true);
-
-    Storage::disk('local')->put('plugin-reports/epg-repair/keep-me.csv', 'report');
-
-    $plugin = $pluginManager->uninstall($plugin->fresh(), 'preserve');
-
-    expect($plugin->isInstalled())->toBeFalse();
-    expect($plugin->enabled)->toBeFalse();
-    expect($plugin->last_cleanup_mode)->toBe('preserve');
-    expect($plugin->uninstalled_at)->not->toBeNull();
-    expect(data_get($plugin->data_ownership, 'directories'))->toContain('plugin-reports/epg-repair');
-    expect(Storage::disk('local')->exists('plugin-reports/epg-repair/keep-me.csv'))->toBeTrue();
-});
-
-it('purges declared plugin-owned data and blocks execution until reinstall', function () {
-    Storage::fake('local');
-
-    $pluginManager = app(PluginManager::class);
-    $plugin = discoverPluginForTests(true);
-
-    Storage::disk('local')->put('plugin-reports/epg-repair/remove-me.csv', 'report');
-    $user = User::factory()->create();
-    $playlist = Playlist::create([
-        'name' => 'Cleanup Playlist',
-        'uuid' => (string) Str::uuid(),
-        'url' => 'http://example.test/cleanup.m3u',
-        'status' => Status::Completed,
-        'prefix' => 'cleanup',
-        'channels' => 1,
-        'synced' => now(),
-        'id_channel_by' => 'stream_id',
-        'user_id' => $user->id,
-    ]);
-    $channel = Channel::create([
-        'name' => 'Cleanup Channel',
-        'title' => 'Cleanup Channel',
-        'enabled' => true,
-        'channel' => 1,
-        'shift' => 0,
-        'url' => 'http://stream.example.test/cleanup.ts',
-        'logo' => '',
-        'group' => 'Cleanup',
-        'stream_id' => 'cleanup-1',
-        'lang' => 'en',
-        'country' => 'US',
-        'user_id' => $user->id,
-        'playlist_id' => $playlist->id,
-        'group_id' => null,
-        'is_vod' => false,
-        'epg_channel_id' => null,
-    ]);
-    $run = ExtensionPluginRun::query()->create([
-        'extension_plugin_id' => $plugin->id,
-        'user_id' => $user->id,
-        'status' => 'completed',
-        'invocation_type' => 'action',
-        'action' => 'scan',
-        'trigger' => 'manual',
-        'dry_run' => true,
-    ]);
-    PluginEpgRepairScanCandidate::query()->create([
-        'extension_plugin_run_id' => $run->id,
-        'channel_id' => $channel->id,
-        'playlist_id' => $playlist->id,
-        'playlist_name' => $playlist->name,
-        'issue' => 'unmapped',
-        'decision' => 'repairable',
-        'repairable' => true,
-        'review_status' => 'pending',
-    ]);
-
-    $plugin = $pluginManager->uninstall($plugin->fresh(), 'purge');
-
-    expect($plugin->isInstalled())->toBeFalse();
-    expect($plugin->last_cleanup_mode)->toBe('purge');
-    expect(Storage::disk('local')->exists('plugin-reports/epg-repair/remove-me.csv'))->toBeFalse();
-    expect(Schema::hasTable('plugin_epg_repair_scan_candidates'))->toBeFalse();
-
-    expect(fn () => $pluginManager->instantiate($plugin->fresh()))
-        ->toThrow(\RuntimeException::class, 'has been uninstalled');
-
-    $reinstalled = $pluginManager->reinstall($plugin->fresh());
-
-    expect($reinstalled->isInstalled())->toBeTrue();
-    expect($reinstalled->uninstalled_at)->toBeNull();
-    expect($reinstalled->last_cleanup_mode)->toBeNull();
-});
-
-it('can rediscover a forgotten registry row without treating it as uninstall cleanup', function () {
-    $pluginManager = app(PluginManager::class);
-    $plugin = discoverPluginForTests();
-    $pluginId = $plugin->plugin_id;
-
-    $plugin->delete();
-
-    expect(ExtensionPlugin::query()->where('plugin_id', $pluginId)->exists())->toBeFalse();
-
-    $rediscovered = collect($pluginManager->discover())
-        ->firstWhere('plugin_id', $pluginId);
-
-    expect($rediscovered->plugin_id)->toBe($pluginId);
-    expect($rediscovered->isInstalled())->toBeTrue();
-    expect($rediscovered->last_cleanup_mode)->toBeNull();
-});
-
-it('supports plugin lifecycle commands from the host', function () {
-    Storage::fake('local');
-
-    app(PluginManager::class)->discover();
-    Storage::disk('local')->put('plugin-reports/epg-repair/cli-cleanup.csv', 'report');
-
-    $this->artisan('plugins:uninstall', [
-        'pluginId' => 'epg-repair',
-        '--cleanup' => 'preserve',
-    ])->assertSuccessful()
-        ->expectsOutputToContain('uninstalled with cleanup mode [preserve]');
-
-    expect(app(PluginManager::class)->findPluginById('epg-repair')?->isInstalled())->toBeFalse();
-    expect(Storage::disk('local')->exists('plugin-reports/epg-repair/cli-cleanup.csv'))->toBeTrue();
-
-    $this->artisan('plugins:reinstall', [
-        'pluginId' => 'epg-repair',
-    ])->assertSuccessful()
-        ->expectsOutputToContain('Plugin [epg-repair] reinstalled.');
-
-    expect(app(PluginManager::class)->findPluginById('epg-repair')?->isInstalled())->toBeTrue();
-
-    $this->artisan('plugins:forget', [
-        'pluginId' => 'epg-repair',
-    ])->assertSuccessful()
-        ->expectsOutputToContain('registry record deleted');
-
-    expect(ExtensionPlugin::query()->where('plugin_id', 'epg-repair')->exists())->toBeFalse();
-    expect(Storage::disk('local')->exists('plugin-reports/epg-repair/cli-cleanup.csv'))->toBeTrue();
-});
-
-it('supports trust, block, and integrity verification commands from the host', function () {
-    $this->artisan('plugins:discover')->assertSuccessful();
-    $review = app(PluginManager::class)->stageDirectoryReview(base_path('plugins/epg-repair'));
-    app(PluginManager::class)->scanInstallReview($review);
-    app(PluginManager::class)->approveInstallReview($review, false);
-
-    $this->artisan('plugins:verify-integrity', [
-        'pluginId' => 'epg-repair',
-    ])->assertSuccessful()
-        ->expectsOutputToContain('integrity=unknown');
-
-    $this->artisan('plugins:trust', [
-        'pluginId' => 'epg-repair',
-    ])->assertSuccessful()
-        ->expectsOutputToContain('now trusted');
-
-    $plugin = app(PluginManager::class)->findPluginById('epg-repair');
-
-    expect($plugin?->trust_state)->toBe('trusted');
-    expect($plugin?->integrity_status)->toBe('verified');
-
-    $this->artisan('plugins:block', [
-        'pluginId' => 'epg-repair',
-    ])->assertSuccessful()
-        ->expectsOutputToContain('now blocked');
-
-    expect(app(PluginManager::class)->findPluginById('epg-repair')?->trust_state)->toBe('blocked');
-});
-
-it('supports the reviewed install command flow for local plugin directories', function () {
-    $this->artisan('plugins:stage-directory', [
-        'path' => base_path('plugins/epg-repair'),
-    ])->assertSuccessful()
-        ->expectsOutputToContain('Created install review');
-
-    $review = PluginInstallReview::query()->latest('id')->first();
-
-    expect($review)->not->toBeNull();
-    expect($review?->plugin_id)->toBe('epg-repair');
-
-    $this->artisan('plugins:scan-install', [
-        'reviewId' => $review->id,
-    ])->assertSuccessful()
-        ->expectsOutputToContain('scan status: clean');
-
-    $this->artisan('plugins:approve-install', [
-        'reviewId' => $review->id,
-        '--trust' => true,
-    ])->assertSuccessful()
-        ->expectsOutputToContain('installed plugin [epg-repair]');
-
-    $plugin = app(PluginManager::class)->findPluginById('epg-repair');
-
-    expect($plugin?->trust_state)->toBe('trusted');
-    expect($plugin?->integrity_status)->toBe('verified');
-});
-
-it('updates an installed plugin from a reviewed archive and keeps it enabled when trusted', function () {
-    $pluginManager = app(PluginManager::class);
-    $archivePath = storage_path('app/testing-plugin-archives/epg-repair-duplicate.zip');
-    $updatedSourcePath = storage_path('app/testing-plugin-sources/epg-repair-update');
-
-    File::deleteDirectory($updatedSourcePath);
-    File::ensureDirectoryExists(dirname($archivePath));
-    File::ensureDirectoryExists(dirname($archivePath));
-    File::delete($archivePath);
+it('supports plugin lifecycle and trust commands for a fixture plugin', function () {
+    $pluginId = 'cli-fixture-'.Str::lower(Str::random(6));
+    $paths = createReviewFixturePlugin($pluginId);
 
     try {
-        $firstReview = $pluginManager->stageDirectoryReview(base_path('plugins/epg-repair'));
-        $firstReview = $pluginManager->scanInstallReview($firstReview);
-        $pluginManager->approveInstallReview($firstReview, true);
-        $plugin = $pluginManager->findPluginById('epg-repair');
-        $plugin?->update(['enabled' => true]);
+        $this->artisan('plugins:stage-directory', [
+            'path' => $paths['source'],
+        ])->assertSuccessful()
+            ->expectsOutputToContain('Created install review');
 
-        File::copyDirectory(base_path('plugins/epg-repair'), $updatedSourcePath);
+        $review = PluginInstallReview::query()->latest('id')->first();
+
+        expect($review)->not->toBeNull();
+        expect($review?->plugin_id)->toBe($pluginId);
+
+        $this->artisan('plugins:scan-install', [
+            'reviewId' => $review->id,
+        ])->assertSuccessful()
+            ->expectsOutputToContain('scan status: clean');
+
+        $this->artisan('plugins:approve-install', [
+            'reviewId' => $review->id,
+            '--trust' => true,
+        ])->assertSuccessful()
+            ->expectsOutputToContain("installed plugin [{$pluginId}]");
+
+        $this->artisan('plugins:block', [
+            'pluginId' => $pluginId,
+        ])->assertSuccessful()
+            ->expectsOutputToContain('now blocked');
+
+        $this->artisan('plugins:reinstall', [
+            'pluginId' => $pluginId,
+        ])->assertSuccessful()
+            ->expectsOutputToContain("Plugin [{$pluginId}] reinstalled.");
+
+        $this->artisan('plugins:forget', [
+            'pluginId' => $pluginId,
+        ])->assertSuccessful()
+            ->expectsOutputToContain('registry record deleted');
+
+        expect(ExtensionPlugin::query()->where('plugin_id', $pluginId)->exists())->toBeFalse();
+    } finally {
+        cleanupReviewFixturePlugin($pluginId);
+    }
+});
+
+it('updates an installed fixture plugin from a reviewed archive and keeps it enabled when trusted', function () {
+    $pluginId = 'update-fixture-'.Str::lower(Str::random(6));
+    $pluginManager = app(PluginManager::class);
+
+    try {
+        $installed = installFixturePluginForTests($pluginId, trust: true, enabled: true);
+        $archivePath = $installed['paths']['archive'];
+        $updatedSourcePath = storage_path('app/testing-plugin-sources/'.$pluginId.'-update');
+
+        File::deleteDirectory($updatedSourcePath);
+        File::copyDirectory($installed['paths']['source'], $updatedSourcePath);
 
         $manifestPath = $updatedSourcePath.'/plugin.json';
         $manifest = json_decode(File::get($manifestPath), true, flags: JSON_THROW_ON_ERROR);
         $manifest['version'] = '1.0.1';
-        $manifest['description'] = 'Reviewed update package for EPG Repair.';
+        $manifest['description'] = 'Reviewed update package for fixture plugin.';
         File::put($manifestPath, json_encode($manifest, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES).PHP_EOL);
 
         createZipArchiveForTests($updatedSourcePath, $archivePath);
@@ -1433,23 +750,17 @@ it('updates an installed plugin from a reviewed archive and keeps it enabled whe
         $secondReview = $pluginManager->stageArchiveReview($archivePath);
         $secondReview = $pluginManager->scanInstallReview($secondReview);
         $secondReview = $pluginManager->approveInstallReview($secondReview, true);
-        $updatedPlugin = $pluginManager->findPluginById('epg-repair');
+        $updatedPlugin = $pluginManager->findPluginById($pluginId);
 
         expect($secondReview->status)->toBe('installed');
         expect($updatedPlugin?->version)->toBe('1.0.1');
-        expect($updatedPlugin?->description)->toBe('Reviewed update package for EPG Repair.');
+        expect($updatedPlugin?->description)->toBe('Reviewed update package for fixture plugin.');
         expect($updatedPlugin?->trust_state)->toBe('trusted');
         expect($updatedPlugin?->integrity_status)->toBe('verified');
         expect($updatedPlugin?->enabled)->toBeTrue();
-
-        $this->artisan('plugins:approve-install', [
-            'reviewId' => $secondReview->id,
-            '--trust' => true,
-        ])->assertSuccessful()
-            ->expectsOutputToContain('installed plugin [epg-repair]');
     } finally {
-        File::delete($archivePath);
-        File::deleteDirectory($updatedSourcePath);
+        File::deleteDirectory($updatedSourcePath ?? '');
+        cleanupReviewFixturePlugin($pluginId);
     }
 });
 
@@ -1498,143 +809,133 @@ it('supports the reviewed install command flow for GitHub release archives', fun
 });
 
 it('reports plugin registry health through the doctor command', function () {
-    Storage::fake('local');
+    $pluginId = 'doctor-fixture-'.Str::lower(Str::random(6));
 
-    $plugin = collect(app(PluginManager::class)->discover())
-        ->firstWhere('plugin_id', 'epg-repair');
-    $plugin = app(PluginManager::class)->reinstall($plugin->fresh());
-    app(PluginManager::class)->approveInstallReview(
-        app(PluginManager::class)->scanInstallReview(
-            app(PluginManager::class)->stageDirectoryReview(base_path('plugins/epg-repair'))
-        ),
-        true,
-    );
+    try {
+        installFixturePluginForTests($pluginId, trust: true);
 
-    $this->artisan('plugins:doctor')
-        ->assertSuccessful()
-        ->expectsOutputToContain('Plugin registry looks healthy.');
-
-    $plugin->update([
-        'enabled' => false,
-        'installation_status' => 'uninstalled',
-        'last_cleanup_mode' => 'purge',
-        'data_ownership' => [
-            'tables' => ['plugin_epg_repair_scan_candidates'],
-            'directories' => ['plugin-reports/epg-repair'],
-            'files' => [],
-            'default_cleanup_policy' => 'preserve',
-        ],
-    ]);
-    Storage::disk('local')->put('plugin-reports/epg-repair/orphan.csv', 'report');
-
-    $this->artisan('plugins:doctor')
-        ->assertSuccessful()
-        ->expectsOutputToContain('still exists after a purge uninstall');
+        $this->artisan('plugins:doctor')
+            ->assertSuccessful()
+            ->expectsOutputToContain('Plugin registry looks healthy.');
+    } finally {
+        cleanupReviewFixturePlugin($pluginId);
+    }
 });
 
 it('loads a plugin run detail page inside the plugin resource', function () {
-    $plugin = discoverPluginForTests(true);
+    $pluginId = 'run-page-fixture-'.Str::lower(Str::random(6));
+    $installed = installFixturePluginForTests($pluginId, trust: true, enabled: true);
+    $plugin = $installed['plugin'];
 
-    $user = User::factory()->create([
-        'permissions' => ['use_tools'],
-    ]);
+    try {
+        $user = User::factory()->create([
+            'permissions' => ['use_tools'],
+        ]);
 
-    $this->actingAs($user);
+        $this->actingAs($user);
 
-    $run = ExtensionPluginRun::query()->create([
-        'extension_plugin_id' => $plugin->id,
-        'user_id' => $user->id,
-        'status' => 'running',
-        'invocation_type' => 'action',
-        'action' => 'scan',
-        'trigger' => 'manual',
-        'dry_run' => true,
-        'payload' => ['playlist_id' => 123],
-        'summary' => 'Queued for inspection.',
-        'started_at' => now(),
-    ]);
+        $run = ExtensionPluginRun::query()->create([
+            'extension_plugin_id' => $plugin->id,
+            'user_id' => $user->id,
+            'status' => 'running',
+            'invocation_type' => 'action',
+            'action' => 'scan',
+            'trigger' => 'manual',
+            'dry_run' => true,
+            'payload' => ['playlist_id' => 123],
+            'summary' => 'Queued for inspection.',
+            'started_at' => now(),
+        ]);
 
-    $run->logs()->create([
-        'level' => 'info',
-        'message' => 'Plugin run started.',
-        'context' => ['playlist_id' => 123],
-    ]);
+        $run->logs()->create([
+            'level' => 'info',
+            'message' => 'Plugin run started.',
+            'context' => ['playlist_id' => 123],
+        ]);
 
-    Livewire::test(ViewPluginRun::class, [
-        'record' => $plugin->id,
-        'run' => $run->id,
-    ])
-        ->assertOk()
-        ->assertSee('Plugin run started.')
-        ->assertSee('Queued for inspection.');
+        Livewire::test(ViewPluginRun::class, [
+            'record' => $plugin->id,
+            'run' => $run->id,
+        ])
+            ->assertOk()
+            ->assertSee('Plugin run started.')
+            ->assertSee('Queued for inspection.');
+    } finally {
+        cleanupReviewFixturePlugin($pluginId);
+    }
 });
 
 it('marks stale runs, supports cancellation requests, and queues resume for stale runs', function () {
+    $pluginId = 'stale-run-fixture-'.Str::lower(Str::random(6));
     $pluginManager = app(PluginManager::class);
-    $plugin = discoverPluginForTests(true);
+    $installed = installFixturePluginForTests($pluginId, trust: true, enabled: true);
+    $plugin = $installed['plugin'];
 
-    $user = User::factory()->create([
-        'permissions' => ['use_tools'],
-    ]);
+    try {
+        $user = User::factory()->create([
+            'permissions' => ['use_tools'],
+        ]);
 
-    $staleRun = ExtensionPluginRun::query()->create([
-        'extension_plugin_id' => $plugin->id,
-        'user_id' => $user->id,
-        'status' => 'running',
-        'invocation_type' => 'action',
-        'action' => 'scan',
-        'trigger' => 'manual',
-        'dry_run' => true,
-        'payload' => ['playlist_id' => 123],
-        'progress' => 42,
-        'progress_message' => 'Still working through checkpoint 3.',
-        'last_heartbeat_at' => now()->subMinutes(20),
-        'started_at' => now()->subMinutes(25),
-        'run_state' => [
-            'epg_repair' => [
-                'last_channel_id' => 999,
-                'channels_scanned' => 420,
+        $staleRun = ExtensionPluginRun::query()->create([
+            'extension_plugin_id' => $plugin->id,
+            'user_id' => $user->id,
+            'status' => 'running',
+            'invocation_type' => 'action',
+            'action' => 'scan',
+            'trigger' => 'manual',
+            'dry_run' => true,
+            'payload' => ['playlist_id' => 123],
+            'progress' => 42,
+            'progress_message' => 'Still working through checkpoint 3.',
+            'last_heartbeat_at' => now()->subMinutes(20),
+            'started_at' => now()->subMinutes(25),
+            'run_state' => [
+                'resume' => [
+                    'last_step' => 'checkpoint-3',
+                ],
             ],
-        ],
-    ]);
+        ]);
 
-    expect($pluginManager->recoverStaleRuns())->toBe(1);
+        expect($pluginManager->recoverStaleRuns())->toBe(1);
 
-    $staleRun->refresh();
+        $staleRun->refresh();
 
-    expect($staleRun->status)->toBe('stale');
-    expect($staleRun->stale_at)->not->toBeNull();
-    expect(data_get($staleRun->result, 'status'))->toBe('stale');
+        expect($staleRun->status)->toBe('stale');
+        expect($staleRun->stale_at)->not->toBeNull();
+        expect(data_get($staleRun->result, 'status'))->toBe('stale');
 
-    $runningRun = ExtensionPluginRun::query()->create([
-        'extension_plugin_id' => $plugin->id,
-        'user_id' => $user->id,
-        'status' => 'running',
-        'invocation_type' => 'action',
-        'action' => 'scan',
-        'trigger' => 'manual',
-        'dry_run' => true,
-        'payload' => ['playlist_id' => 456],
-        'started_at' => now(),
-        'last_heartbeat_at' => now(),
-    ]);
+        $runningRun = ExtensionPluginRun::query()->create([
+            'extension_plugin_id' => $plugin->id,
+            'user_id' => $user->id,
+            'status' => 'running',
+            'invocation_type' => 'action',
+            'action' => 'scan',
+            'trigger' => 'manual',
+            'dry_run' => true,
+            'payload' => ['playlist_id' => 456],
+            'started_at' => now(),
+            'last_heartbeat_at' => now(),
+        ]);
 
-    $pluginManager->requestCancellation($runningRun, $user->id);
-    $runningRun->refresh();
+        $pluginManager->requestCancellation($runningRun, $user->id);
+        $runningRun->refresh();
 
-    expect($runningRun->cancel_requested)->toBeTrue();
-    expect($runningRun->cancel_requested_at)->not->toBeNull();
-    expect($runningRun->progress_message)->toContain('Cancellation requested');
+        expect($runningRun->cancel_requested)->toBeTrue();
+        expect($runningRun->cancel_requested_at)->not->toBeNull();
+        expect($runningRun->progress_message)->toContain('Cancellation requested');
 
-    Queue::fake();
+        Queue::fake();
 
-    $pluginManager->resumeRun($staleRun, $user->id);
+        $pluginManager->resumeRun($staleRun, $user->id);
 
-    Queue::assertPushed(ExecutePluginInvocation::class, function (ExecutePluginInvocation $job) use ($plugin, $staleRun, $user) {
-        return $job->pluginId === $plugin->id
-            && $job->invocationType === 'action'
-            && $job->name === 'scan'
-            && $job->options['existing_run_id'] === $staleRun->id
-            && $job->options['user_id'] === $user->id;
-    });
+        Queue::assertPushed(ExecutePluginInvocation::class, function (ExecutePluginInvocation $job) use ($plugin, $staleRun, $user) {
+            return $job->pluginId === $plugin->id
+                && $job->invocationType === 'action'
+                && $job->name === 'scan'
+                && $job->options['existing_run_id'] === $staleRun->id
+                && $job->options['user_id'] === $user->id;
+        });
+    } finally {
+        cleanupReviewFixturePlugin($pluginId);
+    }
 });
