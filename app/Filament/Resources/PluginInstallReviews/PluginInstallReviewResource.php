@@ -5,6 +5,8 @@ namespace App\Filament\Resources\PluginInstallReviews;
 use App\Filament\Resources\PluginInstallReviews\Pages\EditPluginInstallReview;
 use App\Filament\Resources\PluginInstallReviews\Pages\ListPluginInstallReviews;
 use App\Models\PluginInstallReview;
+use Filament\Actions\DeleteAction;
+use Filament\Actions\DeleteBulkAction;
 use Filament\Forms\Components\Placeholder;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
@@ -12,6 +14,7 @@ use Filament\Resources\Resource;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
 use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Enums\RecordActionsPosition;
 use Filament\Tables\Table;
 
 class PluginInstallReviewResource extends Resource
@@ -144,6 +147,20 @@ class PluginInstallReviewResource extends Resource
                 TextColumn::make('scan_status')->badge()->hidden(fn () => static::useFakeScanner()),
                 TextColumn::make('created_at')->since()->sortable(),
                 TextColumn::make('installed_at')->since()->sortable(),
+            ])->recordActions([
+                DeleteAction::make()
+                    ->button()
+                    ->hiddenLabel()
+                    ->size('sm'),
+            ], RecordActionsPosition::BeforeCells)
+            ->toolbarActions([
+                DeleteBulkAction::make()
+                    ->hiddenLabel()
+                    ->size('sm')
+                    ->icon('heroicon-s-trash')
+                    ->color('danger')
+                    ->visible(fn () => auth()->user()->canManagePlugins())
+                    ->modalDescription('Removes the selected reviews from the system. This does not affect the installed plugins or their files on disk.'),
             ]);
     }
 
