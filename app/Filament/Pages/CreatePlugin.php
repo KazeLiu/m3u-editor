@@ -65,23 +65,21 @@ class CreatePlugin extends Page
                         ->icon('heroicon-o-pencil')
                         ->description('Name and describe your plugin')
                         ->schema([
-                            Section::make()
-                                ->schema([
-                                    TextInput::make('name')
-                                        ->label('Plugin Name')
-                                        ->placeholder('My Awesome Plugin')
-                                        ->required()
-                                        ->maxLength(100)
-                                        ->helperText(fn (?string $state): string => $state
-                                            ? 'Plugin ID: '.Str::slug(trim($state))
-                                            : 'Enter a human-friendly name — the slug is generated automatically.')
-                                        ->live(debounce: 500),
-                                    TextInput::make('description')
-                                        ->label('Description')
-                                        ->placeholder('What does this plugin do?')
-                                        ->maxLength(255)
-                                        ->helperText('Short description for the plugin manifest. Leave blank for a default.'),
-                                ]),
+                            TextInput::make('name')
+                                ->label('Plugin Name')
+                                ->placeholder('My Awesome Plugin')
+                                ->required()
+                                ->maxLength(100)
+                                ->helperText(fn (?string $state): string => $state
+                                    ? 'Plugin ID: '.Str::slug(trim($state))
+                                    : 'Enter a human-friendly name — the slug is generated automatically.')
+                                ->live(debounce: 500),
+                            TextInput::make('description')
+                                ->label('Description')
+                                ->placeholder('What does this plugin do?')
+                                ->maxLength(255)
+                                ->helperText('Short description for the plugin manifest. Leave blank for a default.'),
+
                         ]),
 
                     Step::make('Capabilities')
@@ -89,6 +87,7 @@ class CreatePlugin extends Page
                         ->description('What your plugin can do')
                         ->schema([
                             Section::make('Capabilities')
+                                ->compact()
                                 ->description('Select what your plugin will participate in. Each capability adds a required PHP interface to your Plugin class.')
                                 ->schema([
                                     CheckboxList::make('capabilities')
@@ -103,6 +102,7 @@ class CreatePlugin extends Page
                                         ->columns(1),
                                 ]),
                             Section::make('Event Triggers')
+                                ->compact()
                                 ->description('Subscribe to host events that will automatically run your plugin in the background.')
                                 ->schema([
                                     CheckboxList::make('hooks')
@@ -122,22 +122,19 @@ class CreatePlugin extends Page
                         ->icon('heroicon-o-cog-6-tooth')
                         ->description('Configure scaffold options')
                         ->schema([
-                            Section::make()
-                                ->schema([
-                                    Radio::make('cleanup_mode')
-                                        ->label('Default Uninstall Behavior')
-                                        ->options([
-                                            'preserve' => 'Preserve data — keep plugin tables and files on uninstall',
-                                            'purge' => 'Purge data — delete plugin tables and files on uninstall',
-                                        ])
-                                        ->default('preserve'),
-                                    Toggle::make('lifecycle')
-                                        ->label('Include lifecycle hook')
-                                        ->helperText('Adds an uninstall() method for custom cleanup logic beyond what the manifest declares.'),
-                                    Toggle::make('bare')
-                                        ->label('Bare scaffold')
-                                        ->helperText('Generate only plugin.json and Plugin.php — skip README, CI workflow, scripts, and AI guidance files.'),
-                                ]),
+                            Radio::make('cleanup_mode')
+                                ->label('Default Uninstall Behavior')
+                                ->options([
+                                    'preserve' => 'Preserve data — keep plugin tables and files on uninstall',
+                                    'purge' => 'Purge data — delete plugin tables and files on uninstall',
+                                ])
+                                ->default('preserve'),
+                            Toggle::make('lifecycle')
+                                ->label('Include lifecycle hook')
+                                ->helperText('Adds an uninstall() method for custom cleanup logic beyond what the manifest declares.'),
+                            Toggle::make('bare')
+                                ->label('Bare scaffold')
+                                ->helperText('Generate only plugin.json and Plugin.php — skip README, CI workflow, scripts, and AI guidance files.'),
                         ]),
 
                     Step::make('Generate')
