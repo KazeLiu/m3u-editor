@@ -598,10 +598,6 @@ php artisan migrate --force
 # Jobs database uses a separate SQLite file for queue job tracking (see config/database.php)
 php artisan migrate --database=jobs --force
 
-# Auto-trust bundled (first-party) plugins shipped in the image
-echo "🔌 Syncing bundled plugins..."
-php artisan plugins:sync-bundled
-
 # Register webhook for real-time cache invalidation
 # This works for both embedded and external m3u-proxy modes
 # The command will check if m3u-proxy is configured before attempting registration

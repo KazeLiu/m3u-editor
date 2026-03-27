@@ -297,8 +297,10 @@ RUN chown -R ${WWWUSER}:${WWWGROUP} /var/www/html && \
 # Default ports: APP_PORT=36400, REVERB_PORT=36800, M3U_PROXY_PORT=8085, XTREAM_PORT=36401
 
 # Health check for the application
+# APP_PORT is set at runtime (default 36400); use the same default here so the
+# Dockerfile HEALTHCHECK works even when docker-compose is not in use.
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
-    CMD curl -f http://localhost/up || exit 1
+    CMD curl -f http://localhost:${APP_PORT:-36400}/up || exit 1
 
 # Final entrypoint
 ENTRYPOINT ["start-container"]
