@@ -144,7 +144,6 @@ class SeriesResource extends Resource
                 ->toggleable(),
             ToggleColumn::make('enabled')
                 ->toggleable()
-                ->tooltip('Toggle series status')
                 ->sortable(),
             IconColumn::make('has_metadata')
                 ->label('TMDB/TVDB')
