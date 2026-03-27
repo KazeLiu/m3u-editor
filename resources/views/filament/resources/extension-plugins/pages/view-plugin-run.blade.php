@@ -55,7 +55,7 @@
                         </p>
                     </div>
 
-                    <div class="grid gap-3 sm:grid-cols-3">
+                    <div class="grid gap-3 sm:grid-cols-1">
                         <div
                             class="rounded-2xl border border-gray-200 bg-white/80 p-4 backdrop-blur dark:border-gray-800 dark:bg-gray-900/80">
                             <div
@@ -65,7 +65,8 @@
                                 {{ $run->action ? \Illuminate\Support\Str::headline($run->action) : ($run->hook ? \Illuminate\Support\Str::headline($run->hook) : 'Plugin run') }}
                             </div>
                             <div class="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                                {{ \Illuminate\Support\Str::headline($run->invocation_type) }}</div>
+                                {{ \Illuminate\Support\Str::headline($run->invocation_type) }}
+                            </div>
                         </div>
                         <div
                             class="rounded-2xl border border-gray-200 bg-white/80 p-4 backdrop-blur dark:border-gray-800 dark:bg-gray-900/80">
@@ -73,7 +74,8 @@
                                 class="text-[11px] font-semibold uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">
                                 Current signal</div>
                             <div class="mt-2 text-sm font-medium text-gray-950 dark:text-white">
-                                {{ $run->progress_message ?: ($latestMessage ?: 'No log messages yet') }}</div>
+                                {{ $run->progress_message ?: ($latestMessage ?: 'No log messages yet') }}
+                            </div>
                             <div class="mt-3 h-2 overflow-hidden rounded-full bg-gray-100 dark:bg-gray-800">
                                 <div class="h-full rounded-full bg-primary-500 transition-all"
                                     style="width: {{ max(2, $progress) }}%"></div>
@@ -87,9 +89,11 @@
                                 class="text-[11px] font-semibold uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">
                                 Queued by</div>
                             <div class="mt-2 text-sm font-medium text-gray-950 dark:text-white">
-                                {{ $run->user?->name ?? 'System' }}</div>
+                                {{ $run->user?->name ?? 'System' }}
+                            </div>
                             <div class="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                                {{ $fmt->format($run->created_at, 'Unknown time') }}</div>
+                                {{ $fmt->format($run->created_at, 'Unknown time') }}
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -104,19 +108,22 @@
                             <div>
                                 <dt class="text-xs uppercase tracking-wide text-gray-400 dark:text-gray-500">Queued</dt>
                                 <dd class="mt-1 font-medium text-gray-950 dark:text-white">
-                                    {{ $fmt->format($run->created_at) }}</dd>
+                                    {{ $fmt->format($run->created_at) }}
+                                </dd>
                             </div>
                             <div>
                                 <dt class="text-xs uppercase tracking-wide text-gray-400 dark:text-gray-500">Started
                                 </dt>
                                 <dd class="mt-1 font-medium text-gray-950 dark:text-white">
-                                    {{ $run->started_at ? $fmt->format($run->started_at) : 'Not started' }}</dd>
+                                    {{ $run->started_at ? $fmt->format($run->started_at) : 'Not started' }}
+                                </dd>
                             </div>
                             <div>
                                 <dt class="text-xs uppercase tracking-wide text-gray-400 dark:text-gray-500">Finished
                                 </dt>
                                 <dd class="mt-1 font-medium text-gray-950 dark:text-white">
-                                    {{ $run->finished_at ? $fmt->format($run->finished_at) : 'Still running' }}</dd>
+                                    {{ $run->finished_at ? $fmt->format($run->finished_at) : 'Still running' }}
+                                </dd>
                             </div>
                             <div>
                                 <dt class="text-xs uppercase tracking-wide text-gray-400 dark:text-gray-500">Last

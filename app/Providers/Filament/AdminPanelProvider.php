@@ -10,6 +10,7 @@ use App\Filament\Widgets\DiscordWidget;
 use App\Filament\Widgets\DocumentsWidget;
 use App\Filament\Widgets\DonateCrypto;
 use App\Filament\Widgets\KoFiWidget;
+use App\Filament\Widgets\PluginsOverviewWidget;
 use App\Filament\Widgets\SharedStreamStatsWidget;
 use App\Filament\Widgets\StatsOverview;
 use App\Filament\Widgets\SystemHealthWidget;
@@ -137,6 +138,7 @@ class AdminPanelProvider extends PanelProvider
                 DiscordWidget::class,
                 // PayPalDonateWidget::class,
                 KoFiWidget::class,
+                PluginsOverviewWidget::class,
                 // DonateCrypto::class,
                 StatsOverview::class,
                 // SharedStreamStatsWidget::class,

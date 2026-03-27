@@ -7,6 +7,7 @@ use App\Filament\Resources\PluginInstallReviews\PluginInstallReviewResource;
 use App\Filament\Resources\Plugins\PluginResource;
 use App\Models\Plugin;
 use App\Models\PluginInstallReview;
+use App\Models\PluginRun;
 use App\Plugins\PluginManager;
 use Filament\Actions\Action;
 use Filament\Pages\Page;
@@ -77,6 +78,7 @@ class PluginsDashboard extends Page
             'summaryCards' => $this->summaryCards(),
             'attentionPlugins' => $this->attentionPlugins(),
             'recentInstallReviews' => $this->canManagePlugins() ? $this->recentInstallReviews() : collect(),
+            'recentRuns' => $this->recentRuns(),
             'canManagePlugins' => $this->canManagePlugins(),
             'extensionsUrl' => PluginResource::getUrl(),
             'pluginInstallsUrl' => $this->canManagePlugins() ? PluginInstallReviewResource::getUrl() : null,
@@ -167,6 +169,20 @@ class PluginsDashboard extends Page
             ->latest()
             ->limit(6)
             ->get();
+    }
+
+    /**
+     * Return the latest plugin runs across all plugins.
+     *
+     * @return Collection<int, PluginRun>
+     */
+    private function recentRuns(): Collection
+    {
+        return PluginRun::query()
+            ->with('plugin:id,name,plugin_id')
+            ->latest()
+            ->limit(10)
+            ->get(['id', 'extension_plugin_id', 'trigger', 'action', 'hook', 'status', 'created_at', 'finished_at']);
     }
 
     /**
