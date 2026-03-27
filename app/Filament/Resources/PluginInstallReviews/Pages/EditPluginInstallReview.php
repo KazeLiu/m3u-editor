@@ -31,6 +31,7 @@ class EditPluginInstallReview extends EditRecord
                 Action::make('scan')
                     ->label('Run ClamAV Scan')
                     ->icon('heroicon-o-shield-check')
+                    ->hidden(fn () => PluginInstallReviewResource::useFakeScanner())
                     ->action(function () use ($record): void {
                         try {
                             $review = app(PluginManager::class)->scanInstallReview($record);

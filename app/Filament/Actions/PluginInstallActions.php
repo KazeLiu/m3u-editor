@@ -107,7 +107,9 @@ class PluginInstallActions
                                 'application/octet-stream',
                             ])
                             ->maxSize((int) ceil(((int) config('plugins.archive_limits.max_archive_bytes', 50 * 1024 * 1024)) / 1024))
-                            ->helperText('Upload a plugin zip, tar, or tar.gz archive. The server will stage, validate, and scan it through plugin installs.'),
+                            ->helperText(config('plugins.clamav.driver', 'fake') === 'fake'
+                                ? 'Upload a plugin zip, tar, or tar.gz archive. The server will stage and validate it through plugin installs.'
+                                : 'Upload a plugin zip, tar, or tar.gz archive. The server will stage, validate, and scan it through plugin installs.'),
                     ])
                     ->action(function (array $data): void {
                         self::runStagingAction(
@@ -181,7 +183,9 @@ class PluginInstallActions
             Notification::make()
                 ->success()
                 ->title($successTitle)
-                ->body("Plugin install #{$review->id} is ready for validation and scan.")
+                ->body(config('plugins.clamav.driver', 'fake') === 'fake'
+                    ? "Plugin install #{$review->id} is ready for validation."
+                    : "Plugin install #{$review->id} is ready for validation and scan.")
                 ->send();
         } catch (Throwable $exception) {
             Notification::make()

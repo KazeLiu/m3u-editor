@@ -201,6 +201,10 @@ class EditPlugin extends EditRecord
                 Action::make('stage_review')
                     ->label('Stage Current Files For Review')
                     ->icon('heroicon-o-archive-box')
+                    ->requiresConfirmation()
+                    ->color('warning')
+                    ->modalDescription('This creates a staged review of the current plugin files for ClamAV scanning and admin approval in Plugin Installs. This is typically used after updating plugin files via the filesystem or after a failed install attempt to trigger a new review without needing to re-upload files.')
+                    ->modalSubmitActionLabel('Stage for review')
                     ->visible(fn () => $canManagePlugins && filled($this->record->path) && $this->record->available)
                     ->action(function () use ($record): void {
                         $review = app(PluginManager::class)->stageDirectoryReview(

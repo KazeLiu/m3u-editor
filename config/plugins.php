@@ -80,7 +80,7 @@ return [
     ],
 
     'clamav' => [
-        'driver' => env('PLUGIN_SCAN_DRIVER', 'clamav'),
+        'driver' => env('PLUGIN_SCAN_DRIVER', 'fake'), // 'clamav' or 'fake'
         'binary' => env('CLAMAV_BINARY', 'clamscan'),
         'timeout' => (int) env('CLAMAV_TIMEOUT', 60),
         'required_for_trust' => (bool) env('PLUGIN_SCAN_REQUIRED_FOR_TRUST', true),

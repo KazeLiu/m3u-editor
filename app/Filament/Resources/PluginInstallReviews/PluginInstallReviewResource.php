@@ -29,6 +29,11 @@ class PluginInstallReviewResource extends Resource
         return auth()->check() && auth()->user()->canManagePlugins();
     }
 
+    public static function useFakeScanner(): bool
+    {
+        return config('plugins.clamav.driver', 'fake') === 'fake';
+    }
+
     public static function getNavigationLabel(): string
     {
         return 'Installs';
@@ -51,7 +56,7 @@ class PluginInstallReviewResource extends Resource
                     TextInput::make('source_origin')->disabled(),
                     TextInput::make('status')->disabled(),
                     TextInput::make('validation_status')->disabled(),
-                    TextInput::make('scan_status')->disabled(),
+                    TextInput::make('scan_status')->disabled()->hidden(fn () => static::useFakeScanner()),
                     TextInput::make('archive_filename')->disabled(),
                     TextInput::make('expected_archive_sha256')->disabled(),
                     TextInput::make('archive_sha256')->disabled(),
@@ -93,7 +98,7 @@ class PluginInstallReviewResource extends Resource
                         ->dehydrated(false)
                         ->formatStateUsing(fn (?PluginInstallReview $record) => json_encode($record?->data_ownership ?? [], JSON_PRETTY_PRINT)),
                 ]),
-            Section::make('Validation And Scan')
+            Section::make(fn () => static::useFakeScanner() ? 'Validation' : 'Validation And Scan')
                 ->columns(2)
                 ->schema([
                     Textarea::make('validation_errors_json')
@@ -107,6 +112,7 @@ class PluginInstallReviewResource extends Resource
                         ->disabled()
                         ->rows(10)
                         ->dehydrated(false)
+                        ->hidden(fn () => static::useFakeScanner())
                         ->formatStateUsing(fn (?PluginInstallReview $record) => json_encode($record?->scan_details ?? [], JSON_PRETTY_PRINT)),
                     Textarea::make('source_metadata_json')
                         ->label('Source Metadata')
@@ -135,7 +141,7 @@ class PluginInstallReviewResource extends Resource
                 TextColumn::make('source_origin')->limit(40)->toggleable(),
                 TextColumn::make('status')->badge(),
                 TextColumn::make('validation_status')->badge(),
-                TextColumn::make('scan_status')->badge(),
+                TextColumn::make('scan_status')->badge()->hidden(fn () => static::useFakeScanner()),
                 TextColumn::make('created_at')->since()->sortable(),
                 TextColumn::make('installed_at')->since()->sortable(),
             ]);
