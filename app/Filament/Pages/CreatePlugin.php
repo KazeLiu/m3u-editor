@@ -159,7 +159,7 @@ class CreatePlugin extends Page
                             </x-filament::button>
                             <x-filament::button wire:click="downloadZip" color="gray" icon="heroicon-o-arrow-down-tray">
                                 Download as ZIP
-                            </x-filament::button>
+                            </button>
                         </div>
                     BLADE))),
             ])
