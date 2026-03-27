@@ -81,6 +81,8 @@ class PluginResource extends Resource
                                 ]),
                             Section::make('Current Status')
                                 ->compact()
+                                ->icon('heroicon-m-heart')
+                                ->collapsed()
                                 ->columns(3)
                                 ->schema([
                                     Placeholder::make('run_posture')
@@ -95,6 +97,8 @@ class PluginResource extends Resource
                                 ]),
                             Section::make('Capability Map')
                                 ->compact()
+                                ->icon('heroicon-m-chart-bar')
+                                ->collapsed()
                                 ->schema([
                                     Grid::make(2)
                                         ->schema([
@@ -141,9 +145,9 @@ class PluginResource extends Resource
                                 ]),
                             Section::make('Technical Details')
                                 ->compact()
+                                ->icon('heroicon-m-document-magnifying-glass')
                                 ->collapsible()
                                 ->collapsed()
-                                ->description('Internal state for troubleshooting — you shouldn\'t need this unless something is broken.')
                                 ->schema([
                                     Grid::make(2)
                                         ->schema([
