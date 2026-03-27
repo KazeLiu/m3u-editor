@@ -5,10 +5,29 @@ namespace App\Filament\Auth;
 use Filament\Forms\Components\TextInput;
 use Filament\Schemas\Components\Component;
 use Filament\Schemas\Schema;
+use Illuminate\Contracts\Support\Htmlable;
+use Illuminate\Support\HtmlString;
 use Illuminate\Validation\ValidationException;
 
 class Login extends \Filament\Auth\Pages\Login
 {
+    public function mount(): void
+    {
+        // Auto-redirect to OIDC provider if configured
+        if (
+            config('services.oidc.enabled')
+            && config('services.oidc.auto_redirect')
+            && ! request()->has('local')
+            && ! session()->has('oidc_error')
+        ) {
+            $this->redirect(route('auth.oidc.redirect'));
+
+            return;
+        }
+
+        parent::mount();
+    }
+
     /**
      * Get the form fields for the component.
      */
@@ -58,5 +77,18 @@ class Login extends \Filament\Auth\Pages\Login
         throw ValidationException::withMessages([
             'data.login' => 'Invalid login or password. Please try again.',
         ]);
+    }
+
+    public function getSubheading(): string|Htmlable|null
+    {
+        if (session()->has('oidc_error')) {
+            $error = e(session('oidc_error'));
+
+            return new HtmlString(
+                "<span class=\"text-danger-600 dark:text-danger-400\">{$error}</span>"
+            );
+        }
+
+        return parent::getSubheading();
     }
 }

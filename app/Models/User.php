@@ -29,6 +29,7 @@ class User extends Authenticatable implements FilamentUser, HasAppAuthentication
         'remember_token',
         'app_authentication_secret',
         'app_authentication_recovery_codes',
+        'oidc_id',
     ];
 
     /**
@@ -177,6 +178,14 @@ class User extends Authenticatable implements FilamentUser, HasAppAuthentication
     public function series()
     {
         return $this->hasMany(Series::class);
+    }
+
+    /**
+     * Check if the user was created via OIDC authentication.
+     */
+    public function isOidcUser(): bool
+    {
+        return $this->oidc_id !== null;
     }
 
     /**

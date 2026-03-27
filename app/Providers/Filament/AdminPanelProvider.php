@@ -190,6 +190,14 @@ class AdminPanelProvider extends PanelProvider
             );
         }
 
+        // Register OIDC SSO button on the login page
+        if (config('services.oidc.enabled')) {
+            FilamentView::registerRenderHook(
+                PanelsRenderHook::AUTH_LOGIN_FORM_AFTER,
+                fn (): string => view('filament.auth.oidc-login-button')->render(),
+            );
+        }
+
         // Force password change modal — shown to any authenticated user with must_change_password = true
         FilamentView::registerRenderHook(
             PanelsRenderHook::BODY_START,

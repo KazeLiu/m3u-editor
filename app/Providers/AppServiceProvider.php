@@ -59,6 +59,7 @@ use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Route;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Log;
@@ -70,6 +71,8 @@ use Illuminate\Support\HtmlString;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Str;
 use Livewire\Livewire;
+use SocialiteProviders\Manager\SocialiteWasCalled;
+use SocialiteProviders\OIDC\OIDCExtendSocialite;
 use Spatie\Tags\Tag;
 use Throwable;
 
@@ -144,6 +147,9 @@ class AppServiceProvider extends ServiceProvider
 
         // Apply user-defined timezone (when TZ env var is not set)
         $this->applyTimezoneFromSettings();
+
+        // Register the OIDC Socialite driver (when enabled)
+        $this->registerOidcProvider();
 
         // Livewire components
         $this->registerLivewireComponents();
@@ -879,6 +885,21 @@ class AppServiceProvider extends ServiceProvider
 
         // Register the TMDB search component
         Livewire::component('tmdb-search', TmdbSearch::class);
+    }
+
+    /**
+     * Register the OIDC Socialite driver when OIDC authentication is enabled.
+     */
+    private function registerOidcProvider(): void
+    {
+        if (! config('services.oidc.enabled')) {
+            return;
+        }
+
+        Event::listen(
+            SocialiteWasCalled::class,
+            [OIDCExtendSocialite::class, 'handle'],
+        );
     }
 
     /**
