@@ -105,7 +105,9 @@ class SeriesResource extends Resource
                 return $action->button()->label('Filters');
             })
             ->modifyQueryUsing(function (Builder $query) {
-                $query->with(['playlist']);
+                $query->with([
+                    'playlist' => fn ($q) => $q->select('id', 'name', 'auto_sort'),
+                ]);
             })
             ->paginated([10, 25, 50, 100])
             ->defaultPaginationPageOption(25)
