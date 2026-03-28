@@ -70,7 +70,10 @@ class RefreshEpg extends Command
                 $cronExpression = new CronExpression($epg->sync_interval);
 
                 // Check if sync is due based on last synced time and cron expression
-                $force = $epg->status === Status::Failed; // Force refresh if currently in failed state
+                // Force refresh if currently in failed state, but only after cooldown to prevent CPU runaway
+                $failedRetryCooldown = (int) config('dev.failed_retry_cooldown_minutes', 30);
+                $force = $epg->status === Status::Failed
+                    && $epg->updated_at->diffInMinutes(now()) >= $failedRetryCooldown;
                 $lastRun = $force ? now()->subYears(1) : ($epg->synced ?? now()->subYears(1));
                 $nextDue = $cronExpression->getNextRunDate($lastRun->toDateTimeImmutable());
 
