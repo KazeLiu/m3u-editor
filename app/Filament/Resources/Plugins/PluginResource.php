@@ -81,7 +81,7 @@ class PluginResource extends Resource
                                 ]),
                             Section::make('Current Status')
                                 ->compact()
-                                ->icon('heroicon-m-heart')
+                                ->icon('heroicon-m-bolt')
                                 ->collapsed()
                                 ->columns(3)
                                 ->schema([
@@ -145,7 +145,7 @@ class PluginResource extends Resource
                                 ]),
                             Section::make('Technical Details')
                                 ->compact()
-                                ->icon('heroicon-m-document-magnifying-glass')
+                                ->icon('heroicon-m-magnifying-glass')
                                 ->collapsible()
                                 ->collapsed()
                                 ->schema([
