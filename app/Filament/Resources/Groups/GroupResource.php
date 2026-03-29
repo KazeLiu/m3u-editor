@@ -4,11 +4,11 @@ namespace App\Filament\Resources\Groups;
 
 use App\Facades\SortFacade;
 use App\Filament\Resources\Groups\Pages\EditGroup;
-use App\Models\Channel;
 use App\Filament\Resources\Groups\Pages\ListGroups;
 use App\Filament\Resources\Groups\RelationManagers\ChannelsRelationManager;
 use App\Jobs\GroupFindAndReplace;
 use App\Jobs\GroupFindAndReplaceReset;
+use App\Models\Channel;
 use App\Models\Group;
 use App\Models\Playlist;
 use App\Services\DateFormatService;
