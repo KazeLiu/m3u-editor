@@ -4,6 +4,7 @@ namespace App\Filament\Resources\Groups;
 
 use App\Facades\SortFacade;
 use App\Filament\Resources\Groups\Pages\EditGroup;
+use App\Models\Channel;
 use App\Filament\Resources\Groups\Pages\ListGroups;
 use App\Filament\Resources\Groups\RelationManagers\ChannelsRelationManager;
 use App\Jobs\GroupFindAndReplace;
@@ -277,10 +278,18 @@ class GroupResource extends Resource
 
                     Action::make('enable')
                         ->label('Enable group channels')
-                        ->action(function ($record): void {
+                        ->action(function (Group $record): void {
                             $record->channels()->update([
                                 'enabled' => true,
                             ]);
+
+                            $maxChannel = Channel::query()
+                                ->where('playlist_id', $record->playlist_id)
+                                ->where('group_id', '!=', $record->id)
+                                ->where('enabled', true)
+                                ->max('channel') ?? 0;
+
+                            SortFacade::bulkRecountGroupChannels($record, $maxChannel + 1);
                         })->after(function () {
                             Notification::make()
                                 ->success()
@@ -389,6 +398,14 @@ class GroupResource extends Resource
                                 $record->channels()->update([
                                     'enabled' => true,
                                 ]);
+
+                                $maxChannel = Channel::query()
+                                    ->where('playlist_id', $record->playlist_id)
+                                    ->where('group_id', '!=', $record->id)
+                                    ->where('enabled', true)
+                                    ->max('channel') ?? 0;
+
+                                SortFacade::bulkRecountGroupChannels($record, $maxChannel + 1);
                             }
                         })->after(function () {
                             Notification::make()
