@@ -28,13 +28,9 @@ it('honors testing cache and session overrides', function () {
  */
 function adminUserForPluginsTests(): User
 {
-    $user = User::factory()->create([
+    return User::factory()->admin()->create([
         'email' => 'plugins-admin-'.Str::lower(Str::random(8)).'@example.com',
     ]);
-
-    config()->set('dev.admin_emails', [$user->email]);
-
-    return $user;
 }
 
 /**

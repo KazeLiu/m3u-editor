@@ -270,8 +270,7 @@ it('rejects unknown capabilities before writing any files', function () {
 });
 
 it('renders the create plugin wizard page for admin users', function () {
-    $admin = User::factory()->create(['email' => 'create-plugin-admin-'.Str::lower(Str::random(6)).'@example.com']);
-    config()->set('dev.admin_emails', [$admin->email]);
+    $admin = User::factory()->admin()->create(['email' => 'create-plugin-admin-'.Str::lower(Str::random(6)).'@example.com']);
 
     $this->actingAs($admin);
 
