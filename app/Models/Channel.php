@@ -195,7 +195,7 @@ class Channel extends Model
     public function getProxyUrl(?bool $withFormat = false, ?string $profileFormat = null, ?string $username = null, ?string $password = null)
     {
         // Load the effective playlist to determine proxy settings and get UUID for authentication
-        $playlist = $this->getEffectivePlaylist();
+        $playlist = Playlist::find($this->playlist_id ?: $this->custom_playlist_id);
         $user = $this->user;
         $originalUrl = $this->url_custom ?? $this->url;
 
@@ -229,7 +229,6 @@ class Channel extends Model
         if ($username && $password) {
             $username = urlencode($username);
             $password = urlencode($password);
-
         } else {
             $username = urlencode($user->name ?? 'admin');
             $password = urlencode($playlist->uuid);

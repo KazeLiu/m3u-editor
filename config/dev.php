@@ -3,18 +3,15 @@
 return [
     'author' => 'Shaun Parkison',
     'version' => '0.10.23',
-    'dev_version' => '0.10.28-dev',
-    'experimental_version' => '0.10.28-exp',
+    'dev_version' => '0.10.29-dev',
+    'experimental_version' => '0.10.29-exp',
     'repo' => 'm3ue/m3u-editor',
     'docs_url' => 'https://m3ue.sparkison.dev',
     'donate' => 'https://buymeacoffee.com/shparkison',
     'discord_url' => 'https://discord.gg/rS3abJ5dz7',
     'paypal' => 'https://www.paypal.com/donate/?hosted_button_id=ULJRPVWJNBSSG',
     'kofi' => 'https://ko-fi.com/sparkison',
-    'admin_emails' => [
-        // Default admin email
-        'admin@test.com',
-    ],
+    'admin_emails' => ['admin@test.com'],
     'tvgid' => [
         'regex' => env('TVGID_REGEX', '/[^a-zA-Z0-9_\-\.]/'),
     ],
