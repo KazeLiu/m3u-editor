@@ -1131,7 +1131,7 @@ class PlaylistResource extends Resource
                         ->hidden(fn (Get $get): bool => ! $get('xtream')),
                     Repeater::make('xtream_fallback_urls')
                         ->label('Fallback URLs')
-                        ->helperText('Alternative server URLs. If the primary URL fails, these will be tried in order. Same credentials are used for all URLs.')
+                        ->helperText('Alternative server URLs. If the primary URL fails during a sync, these will be tried in order (same credentials are used for all URLs).')
                         ->simple(
                             TextInput::make('url')
                                 ->label('URL')
