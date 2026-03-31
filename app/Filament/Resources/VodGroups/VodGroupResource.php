@@ -62,6 +62,7 @@ class VodGroupResource extends Resource
     {
         return __('VOD Channels');
     }
+
     public static function getModelLabel(): string
     {
         return __('VOD Group');

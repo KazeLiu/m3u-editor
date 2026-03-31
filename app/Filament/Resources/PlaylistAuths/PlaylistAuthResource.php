@@ -46,6 +46,7 @@ class PlaylistAuthResource extends Resource
     {
         return __('Playlist');
     }
+
     public static function getModelLabel(): string
     {
         return __('Playlist Auth');

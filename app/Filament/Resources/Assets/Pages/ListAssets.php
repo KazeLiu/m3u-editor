@@ -18,10 +18,11 @@ class ListAssets extends ListRecords
 {
     protected static string $resource = AssetResource::class;
 
-    public function getSubheading(): string|\Illuminate\Contracts\Support\Htmlable|null
+    public function getSubheading(): string|Htmlable|null
     {
         return __('Manage cached logos and uploaded media assets. Placeholder images can be updated in Settings > Assets.');
     }
+
     public function mount(): void
     {
         parent::mount();

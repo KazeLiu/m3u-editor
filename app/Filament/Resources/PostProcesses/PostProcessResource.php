@@ -50,6 +50,7 @@ class PostProcessResource extends Resource
     {
         return __('Tools');
     }
+
     public static function getModelLabel(): string
     {
         return __('Post Process');

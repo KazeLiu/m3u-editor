@@ -14,10 +14,11 @@ class ListStreamProfiles extends ListRecords
 {
     protected static string $resource = StreamProfileResource::class;
 
-    public function getSubheading(): string|\Illuminate\Contracts\Support\Htmlable|null
+    public function getSubheading(): string|Htmlable|null
     {
         return __('Stream profiles are used to define how streams are transcoded by the proxy. They can be assigned to playlists to enable transcoding for those playlists. If a playlist does not have a stream profile assigned, direct stream proxying will be used.');
     }
+
     protected function getHeaderActions(): array
     {
         return [

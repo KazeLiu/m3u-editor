@@ -21,6 +21,7 @@ class PersonalAccessTokenResource extends Resource
     {
         return __('Tools');
     }
+
     public static function getModelLabel(): string
     {
         return __('Personal Access Token');

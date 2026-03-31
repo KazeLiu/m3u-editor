@@ -7,18 +7,19 @@ use Filament\Actions;
 use Filament\Actions\CreateAction;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\ListRecords;
-use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Contracts\Support\Htmlable;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 
 class ListPostProcesses extends ListRecords
 {
     protected static string $resource = PostProcessResource::class;
 
-    public function getSubheading(): string|\Illuminate\Contracts\Support\Htmlable|null
+    public function getSubheading(): string|Htmlable|null
     {
         return __('Call webhooks, or run local scripts, after playlist sync completion.');
     }
+
     protected function getHeaderActions(): array
     {
         return [

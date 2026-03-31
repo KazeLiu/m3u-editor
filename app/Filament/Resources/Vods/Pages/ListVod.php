@@ -37,10 +37,10 @@ use Filament\Schemas\Components\Utilities\Set;
 use Filament\Schemas\Components\View;
 use Filament\Schemas\Schema;
 use Filament\View\PanelsRenderHook;
+use Illuminate\Contracts\Support\Htmlable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Contracts\Support\Htmlable;
 use Livewire\Attributes\Url;
 
 class ListVod extends ListRecords
@@ -49,10 +49,11 @@ class ListVod extends ListRecords
 
     protected static string $resource = VodResource::class;
 
-    public function getSubheading(): string|\Illuminate\Contracts\Support\Htmlable|null
+    public function getSubheading(): string|Htmlable|null
     {
         return __('NOTE: VOD output order is based on: 1 Sort order, 2 Channel no. and 3 Title - in that order. You can edit your Playlist output to auto sort as well, which will define the sort order based on the playlist order.');
     }
+
     #[Url(as: 'status')]
     public ?string $statusFilter = 'all';
 

@@ -46,6 +46,7 @@ class PlaylistAliasResource extends Resource
     {
         return __('Playlist');
     }
+
     public static function getModelLabel(): string
     {
         return __('Playlist Alias');

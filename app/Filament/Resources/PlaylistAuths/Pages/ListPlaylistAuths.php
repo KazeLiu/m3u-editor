@@ -6,18 +6,19 @@ use App\Filament\Resources\PlaylistAuths\PlaylistAuthResource;
 use Filament\Actions\CreateAction;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\ListRecords;
-use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Contracts\Support\Htmlable;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 
 class ListPlaylistAuths extends ListRecords
 {
     protected static string $resource = PlaylistAuthResource::class;
 
-    public function getSubheading(): string|\Illuminate\Contracts\Support\Htmlable|null
+    public function getSubheading(): string|Htmlable|null
     {
         return __('Create credentials and assign them to your Playlist for simple authentication. They can also be used to access the Xtream API for the assigned Playlists.');
     }
+
     protected function getHeaderActions(): array
     {
         return [

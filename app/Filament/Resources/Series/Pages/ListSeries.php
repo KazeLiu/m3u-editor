@@ -31,9 +31,9 @@ use Filament\Schemas\Components\Utilities\Set;
 use Filament\Schemas\Components\View;
 use Filament\Schemas\Schema;
 use Filament\View\PanelsRenderHook;
+use Illuminate\Contracts\Support\Htmlable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Contracts\Support\Htmlable;
 use Livewire\Attributes\Url;
 
 class ListSeries extends ListRecords
@@ -42,10 +42,11 @@ class ListSeries extends ListRecords
 
     protected static string $resource = SeriesResource::class;
 
-    public function getSubheading(): string|\Illuminate\Contracts\Support\Htmlable|null
+    public function getSubheading(): string|Htmlable|null
     {
         return __('Only enabled series will be automatically updated on Playlist sync, this includes fetching episodes and metadata. You can also manually sync series to update episodes and metadata.');
     }
+
     #[Url(as: 'status')]
     public ?string $statusFilter = 'all';
 

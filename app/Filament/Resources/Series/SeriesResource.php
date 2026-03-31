@@ -83,6 +83,7 @@ class SeriesResource extends Resource
     {
         return __('Series');
     }
+
     public static function getModelLabel(): string
     {
         return __('Series');

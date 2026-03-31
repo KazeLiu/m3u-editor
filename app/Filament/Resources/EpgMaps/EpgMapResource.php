@@ -48,6 +48,7 @@ class EpgMapResource extends Resource
     {
         return __('EPG');
     }
+
     public static function getModelLabel(): string
     {
         return __('EPG Map');

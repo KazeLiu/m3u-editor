@@ -12,10 +12,11 @@ class ListEpgs extends ListRecords
 {
     protected static string $resource = EpgResource::class;
 
-    public function getSubheading(): string|\Illuminate\Contracts\Support\Htmlable|null
+    public function getSubheading(): string|Htmlable|null
     {
         return __('Add multiple EPG sources and map them to your playlists. Multiple EPG sources can be mapped to the same playlist, and the guide data will be merged together.');
     }
+
     protected function getHeaderActions(): array
     {
         return [

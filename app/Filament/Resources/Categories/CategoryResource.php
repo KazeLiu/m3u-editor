@@ -62,6 +62,7 @@ class CategoryResource extends Resource
     {
         return __('Series');
     }
+
     public static function getModelLabel(): string
     {
         return __('Category');

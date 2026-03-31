@@ -38,6 +38,7 @@ class PlaylistViewerResource extends Resource
     {
         return __('Playlist');
     }
+
     public static function getModelLabel(): string
     {
         return __('Playlist Viewer');

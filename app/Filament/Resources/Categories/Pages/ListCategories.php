@@ -19,10 +19,11 @@ class ListCategories extends ListRecords
 {
     protected static string $resource = CategoryResource::class;
 
-    public function getSubheading(): string|\Illuminate\Contracts\Support\Htmlable|null
+    public function getSubheading(): string|Htmlable|null
     {
         return __('Manage series categories. Only enabled series will be automatically updated on Playlist sync, this includes fetching episodes and metadata. You can also manually sync series to update episodes and metadata.');
     }
+
     protected function getHeaderActions(): array
     {
         return [

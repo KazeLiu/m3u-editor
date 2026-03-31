@@ -217,7 +217,7 @@ class EditPlugin extends EditRecord
                         Notification::make()
                             ->success()
                             ->title(__('Security review created'))
-                            ->body(__("Review #:id is queued — check Plugin Installs to scan and approve it.", ['id' => $review->id]))
+                            ->body(__('Review #:id is queued — check Plugin Installs to scan and approve it.', ['id' => $review->id]))
                             ->send();
                     }),
                 Action::make('reinstall')

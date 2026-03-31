@@ -54,6 +54,7 @@ class MergedEpgResource extends Resource
     {
         return __('EPG');
     }
+
     public static function getModelLabel(): string
     {
         return __('Merged EPG');

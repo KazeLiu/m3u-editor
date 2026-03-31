@@ -12,10 +12,11 @@ class ListPlaylistAliases extends ListRecords
 {
     protected static string $resource = PlaylistAliasResource::class;
 
-    public function getSubheading(): string|\Illuminate\Contracts\Support\Htmlable|null
+    public function getSubheading(): string|Htmlable|null
     {
         return __('Create an alias of an existing playlist or custom playlist to use a different Xtream API credentials, while still using the same underlying Channel, VOD and Series configurations of the linked playlist.');
     }
+
     protected function getHeaderActions(): array
     {
         return [

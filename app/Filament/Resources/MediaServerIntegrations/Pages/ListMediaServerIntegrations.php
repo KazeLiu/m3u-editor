@@ -4,17 +4,18 @@ namespace App\Filament\Resources\MediaServerIntegrations\Pages;
 
 use App\Filament\Resources\MediaServerIntegrations\MediaServerIntegrationResource;
 use Filament\Actions\CreateAction;
-use Illuminate\Contracts\Support\Htmlable;
 use Filament\Resources\Pages\ListRecords;
+use Illuminate\Contracts\Support\Htmlable;
 
 class ListMediaServerIntegrations extends ListRecords
 {
     protected static string $resource = MediaServerIntegrationResource::class;
 
-    public function getSubheading(): string|\Illuminate\Contracts\Support\Htmlable|null
+    public function getSubheading(): string|Htmlable|null
     {
         return __('Access your media server content directly within M3U Editor by integrating with popular media servers like Emby and Jellyfin, or directly via mount points. An associated playlist will be automatically created for each integration to manage content like you would for any other playlist.');
     }
+
     protected function getHeaderActions(): array
     {
         return [

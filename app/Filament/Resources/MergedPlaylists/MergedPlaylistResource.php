@@ -55,6 +55,7 @@ class MergedPlaylistResource extends Resource
     {
         return __('Playlist');
     }
+
     public static function getModelLabel(): string
     {
         return __('Merged Playlist');

@@ -49,6 +49,7 @@ class ChannelScrubberResource extends Resource
     {
         return __('Playlist');
     }
+
     public static function getModelLabel(): string
     {
         return __('Channel Scrubber');

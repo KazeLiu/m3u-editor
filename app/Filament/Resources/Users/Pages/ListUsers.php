@@ -10,17 +10,18 @@ use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
 use Filament\Notifications\Notification;
-use Illuminate\Contracts\Support\Htmlable;
 use Filament\Resources\Pages\ListRecords;
+use Illuminate\Contracts\Support\Htmlable;
 
 class ListUsers extends ListRecords
 {
     protected static string $resource = UserResource::class;
 
-    public function getSubheading(): string|\Illuminate\Contracts\Support\Htmlable|null
+    public function getSubheading(): string|Htmlable|null
     {
         return __('Manage users that can access and use the application. Each user will have their own playlists, channels, series, and other resources. Some features may be restricted based on user roles (such as global settings).');
     }
+
     protected function getHeaderActions(): array
     {
         return [

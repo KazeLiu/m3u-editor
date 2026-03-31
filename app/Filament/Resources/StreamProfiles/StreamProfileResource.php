@@ -22,6 +22,7 @@ class StreamProfileResource extends Resource
     {
         return __('Proxy');
     }
+
     public static function getModelLabel(): string
     {
         return __('Stream Profile');

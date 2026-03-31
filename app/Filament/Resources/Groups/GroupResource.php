@@ -61,6 +61,7 @@ class GroupResource extends Resource
     {
         return __('Live Channels');
     }
+
     public static function getModelLabel(): string
     {
         return __('Group');

@@ -34,9 +34,9 @@ use Filament\Schemas\Schema;
 use Filament\Support\Enums\Width;
 use Filament\View\PanelsRenderHook;
 use Hydrat\TableLayoutToggle\Concerns\HasToggleableTable;
+use Illuminate\Contracts\Support\Htmlable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Contracts\Support\Htmlable;
 use Livewire\Attributes\Url;
 
 class ListChannels extends ListRecords
@@ -47,10 +47,11 @@ class ListChannels extends ListRecords
 
     protected static string $resource = ChannelResource::class;
 
-    public function getSubheading(): string|\Illuminate\Contracts\Support\Htmlable|null
+    public function getSubheading(): string|Htmlable|null
     {
         return __('NOTE: Playlist channel output order is based on: 1 Sort order, 2 Channel no. and 3 Channel title - in that order. You can edit your Playlist output to auto sort as well, which will define the sort order based on the playlist order.');
     }
+
     #[Url(as: 'status')]
     public ?string $statusFilter = 'all';
 

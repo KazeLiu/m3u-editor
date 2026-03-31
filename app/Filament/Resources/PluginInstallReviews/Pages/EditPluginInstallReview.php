@@ -70,7 +70,7 @@ class EditPluginInstallReview extends EditRecord
                             Notification::make()
                                 ->success()
                                 ->title(__('Plugin installed'))
-                                ->body(__("Plugin install #:id installed [:plugin_id].", ['id' => $review->id, 'plugin_id' => $review->plugin_id]))
+                                ->body(__('Plugin install #:id installed [:plugin_id].', ['id' => $review->id, 'plugin_id' => $review->plugin_id]))
                                 ->send();
 
                             $this->refreshFormData(['status', 'installed_path', 'installed_at']);
@@ -95,7 +95,7 @@ class EditPluginInstallReview extends EditRecord
                             Notification::make()
                                 ->success()
                                 ->title(__('Plugin installed and trusted'))
-                                ->body(__("Plugin install #:id installed and trusted [:plugin_id].", ['id' => $review->id, 'plugin_id' => $review->plugin_id]))
+                                ->body(__('Plugin install #:id installed and trusted [:plugin_id].', ['id' => $review->id, 'plugin_id' => $review->plugin_id]))
                                 ->send();
 
                             $this->refreshFormData(['status', 'installed_path', 'installed_at']);
@@ -120,7 +120,7 @@ class EditPluginInstallReview extends EditRecord
                             Notification::make()
                                 ->success()
                                 ->title(__('Plugin install rejected'))
-                                ->body(__("Plugin install #:id was rejected.", ['id' => $review->id]))
+                                ->body(__('Plugin install #:id was rejected.', ['id' => $review->id]))
                                 ->send();
 
                             $this->refreshFormData(['status', 'review_notes']);

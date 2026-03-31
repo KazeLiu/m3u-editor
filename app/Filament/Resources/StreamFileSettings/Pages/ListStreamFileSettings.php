@@ -12,10 +12,11 @@ class ListStreamFileSettings extends ListRecords
 {
     protected static string $resource = StreamFileSettingResource::class;
 
-    public function getSubheading(): string|\Illuminate\Contracts\Support\Htmlable|null
+    public function getSubheading(): string|Htmlable|null
     {
         return __('Stream file settings define how .strm files are generated and organized. They can be assigned globally in Settings, to Groups/Categories, or directly to individual Series/VOD channels. Priority: Direct > Group/Category > Global.');
     }
+
     protected function getHeaderActions(): array
     {
         return [
