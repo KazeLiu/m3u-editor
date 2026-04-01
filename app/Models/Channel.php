@@ -274,6 +274,29 @@ class Channel extends Model
     }
 
     /**
+     * Return stream_stats, probing via ffprobe and persisting to the database if not yet populated.
+     */
+    public function ensureStreamStats(): array
+    {
+        $stats = $this->stream_stats;
+
+        if (! empty($stats)) {
+            return $stats;
+        }
+
+        $stats = $this->probeStreamStats();
+
+        if (! empty($stats)) {
+            $this->updateQuietly([
+                'stream_stats' => $stats,
+                'stream_stats_probed_at' => now(),
+            ]);
+        }
+
+        return $stats;
+    }
+
+    /**
      * Run ffprobe against this channel's stream URL and return parsed stats.
      *
      * @return array{streams: array<int, array{codec_type: string, codec_name: string, codec_long_name: ?string, profile: ?string, width: ?int, height: ?int, bit_rate: ?string, avg_frame_rate: ?string, display_aspect_ratio: ?string, sample_rate: ?string, channels: ?int, channel_layout: ?string, level: ?int, bits_per_raw_sample: ?string}>}

@@ -151,3 +151,57 @@ it('returns empty array when no stats are persisted or cached', function () {
 
     expect($channel->stream_stats)->toBe([]);
 });
+
+// ──────────────────────────────────────────────────────────────────────────────
+// ensureStreamStats() – on-demand probe with DB persistence
+// ──────────────────────────────────────────────────────────────────────────────
+
+it('returns existing stream_stats without probing when already populated', function () {
+    $stats = [['stream' => ['codec_type' => 'video', 'codec_name' => 'h264', 'width' => 1920, 'height' => 1080]]];
+
+    $channel = Channel::factory()->for($this->playlist)->create([
+        'stream_stats' => $stats,
+        'stream_stats_probed_at' => now()->subHour(),
+    ]);
+
+    $mock = Mockery::mock(Channel::class)->makePartial();
+    $mock->setRawAttributes($channel->getAttributes());
+    $mock->shouldNotReceive('probeStreamStats');
+
+    expect($mock->ensureStreamStats())->toBe($stats);
+});
+
+it('probes and calls updateQuietly with stats when stream_stats is null', function () {
+    $channel = Channel::factory()->for($this->playlist)->create([
+        'stream_stats' => null,
+        'stream_stats_probed_at' => null,
+    ]);
+
+    $probedStats = [['stream' => ['codec_type' => 'video', 'codec_name' => 'h264', 'width' => 1920, 'height' => 1080]]];
+
+    $mock = Mockery::mock(Channel::class)->makePartial();
+    $mock->setRawAttributes($channel->getAttributes());
+    $mock->shouldReceive('probeStreamStats')->once()->andReturn($probedStats);
+    $mock->shouldReceive('updateQuietly')
+        ->once()
+        ->withArgs(fn ($args) => $args['stream_stats'] === $probedStats && isset($args['stream_stats_probed_at']))
+        ->andReturnTrue();
+
+    expect($mock->ensureStreamStats())->toBe($probedStats);
+});
+
+it('returns empty array and does not persist when probe yields nothing', function () {
+    $channel = Channel::factory()->for($this->playlist)->create([
+        'stream_stats' => null,
+        'url' => null,
+        'url_custom' => null,
+    ]);
+
+    $result = $channel->ensureStreamStats();
+
+    expect($result)->toBe([]);
+
+    $channel->refresh();
+    expect($channel->stream_stats)->toBe([])
+        ->and($channel->stream_stats_probed_at)->toBeNull();
+});
