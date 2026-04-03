@@ -311,25 +311,15 @@ class Channel extends Model
 
             $process = new SymfonyProcess(['ffprobe', '-v', 'quiet', '-print_format', 'json', '-show_streams', $url]);
             $process->setTimeout(15);
-            $output = '';
-            $errors = '';
-            $hasErrors = false;
-            $process->run(
-                function ($type, $buffer) use (&$output, &$hasErrors, &$errors) {
-                    if ($type === SymfonyProcess::OUT) {
-                        $output .= $buffer;
-                    }
-                    if ($type === SymfonyProcess::ERR) {
-                        $hasErrors = true;
-                        $errors .= $buffer;
-                    }
-                }
-            );
-            if ($hasErrors) {
-                Log::error("Error running ffprobe for channel \"{$this->title}\": {$errors}");
+            $process->run();
+
+            if ($process->getExitCode() !== 0) {
+                Log::error("Error running ffprobe for channel \"{$this->title}\": {$process->getErrorOutput()}");
 
                 return [];
             }
+
+            $output = $process->getOutput();
             $json = json_decode($output, true);
             if (isset($json['streams']) && is_array($json['streams'])) {
                 $streamStats = [];
