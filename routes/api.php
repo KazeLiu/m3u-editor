@@ -12,7 +12,7 @@ use Illuminate\Support\Facades\Route;
  * EPG API routes (authenticated - used by the in-app EPG viewer)
  */
 
-Route::middleware(['auth:sanctum'])->group(['prefix' => 'epg'], function () {
+Route::middleware(['auth:sanctum'])->prefix('epg')->group(function () {
     Route::get('{uuid}/data', [EpgApiController::class, 'getData'])
         ->name('api.epg.data');
     Route::get('playlist/{uuid}/data', [EpgApiController::class, 'getDataForPlaylist'])
