@@ -199,30 +199,46 @@ class MergeChannels implements ShouldQueue
             return ['processed' => 0, 'deactivated' => 0];
         }
 
-        // Load only the columns needed for matching and scoring to keep memory reasonable
-        $candidates = Channel::where('user_id', $this->user->id)
+        // Validate all patterns up-front so the chunk loop never calls @preg_match
+        $validPatterns = array_values(
+            array_filter($patterns, fn ($p) => @preg_match($p, '') !== false)
+        );
+
+        if (empty($validPatterns)) {
+            return ['processed' => 0, 'deactivated' => 0];
+        }
+
+        // Single DB pass: stream candidates in fixed-size chunks and test every pattern
+        // against each channel in one pass. At any point the working set is bounded by
+        // the chunk size, not the total channel count. Matched channels accumulate per
+        // pattern — for precise patterns this stays small regardless of catalogue size.
+        $matchesByPattern = array_fill(0, \count($validPatterns), []);
+
+        Channel::where('user_id', $this->user->id)
             ->where('can_merge', true)
             ->whereIn('playlist_id', $playlistIds)
             ->when($this->groupId, fn ($q) => $q->where('group_id', $this->groupId))
-            ->get(['id', 'user_id', 'playlist_id', 'group_id', 'title', 'title_custom',
+            ->select(['id', 'user_id', 'playlist_id', 'group_id', 'title', 'title_custom',
                 'name', 'name_custom', 'stream_id', 'stream_id_custom', 'sort',
-                'catchup', 'enabled']);
+                'catchup', 'enabled'])
+            ->chunk(500, function ($chunk) use ($validPatterns, &$matchesByPattern) {
+                foreach ($chunk as $channel) {
+                    $title = $channel->title_custom ?: $channel->title;
+                    $name = $channel->name_custom ?: $channel->name;
+
+                    foreach ($validPatterns as $i => $pattern) {
+                        if (preg_match($pattern, $title) === 1 || preg_match($pattern, $name) === 1) {
+                            $matchesByPattern[$i][] = $channel;
+                        }
+                    }
+                }
+            });
 
         $processed = 0;
         $deactivatedCount = 0;
 
-        foreach ($patterns as $pattern) {
-            // Skip invalid patterns silently
-            if (@preg_match($pattern, '') === false) {
-                continue;
-            }
-
-            $matches = $candidates->filter(function ($channel) use ($pattern) {
-                $title = $channel->title_custom ?: $channel->title;
-                $name = $channel->name_custom ?: $channel->name;
-
-                return preg_match($pattern, $title) === 1 || preg_match($pattern, $name) === 1;
-            });
+        foreach ($validPatterns as $i => $pattern) {
+            $matches = collect($matchesByPattern[$i]);
 
             if ($matches->count() <= 1) {
                 continue;
