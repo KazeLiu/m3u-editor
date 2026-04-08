@@ -202,6 +202,8 @@ class PluginResource extends Resource implements CopilotResource
                     ->sortable(),
                 TextColumn::make('version')
                     ->sortable()
+                    ->badge()
+                    ->color('gray')
                     ->description(fn (Plugin $record) => $record->hasUpdateAvailable() ? "Update: {$record->latest_version}" : null)
                     ->color(fn (Plugin $record) => $record->hasUpdateAvailable() ? 'warning' : null)
                     ->icon(fn (Plugin $record) => $record->hasUpdateAvailable() ? 'heroicon-m-arrow-up-circle' : null),
