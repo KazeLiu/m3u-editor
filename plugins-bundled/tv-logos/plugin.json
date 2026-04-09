@@ -1,7 +1,7 @@
 {
   "id": "tv-logos",
   "name": "TV Logos",
-  "version": "1.0.0",
+  "version": "1.0.2",
   "api_version": "1.0.0",
   "description": "Automatically enriches channel logos from the open-source tv-logo/tv-logos repository via the jsDelivr CDN.",
   "entrypoint": "Plugin.php",

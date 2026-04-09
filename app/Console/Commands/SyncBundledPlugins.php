@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands;
 
+use App\Models\Plugin;
 use App\Plugins\PluginManager;
 use Illuminate\Console\Command;
 use RuntimeException;
@@ -14,6 +15,14 @@ class SyncBundledPlugins extends Command
 
     public function handle(PluginManager $pluginManager): int
     {
+        // Capture enabled state before discover() resets it for version-bumped plugins.
+        $previouslyEnabled = Plugin::query()
+            ->where('source_type', 'bundled')
+            ->where('enabled', true)
+            ->pluck('plugin_id')
+            ->flip()
+            ->all();
+
         $plugins = collect($pluginManager->discover())
             ->filter(fn ($p) => $p->source_type === 'bundled');
 
@@ -36,6 +45,11 @@ class SyncBundledPlugins extends Command
 
             try {
                 $pluginManager->trust($plugin, reason: 'Auto-trusted: shipped in bundled plugins directory.');
+
+                if (array_key_exists($plugin->plugin_id, $previouslyEnabled)) {
+                    $plugin->update(['enabled' => true]);
+                }
+
                 $this->info("Trusted [{$plugin->plugin_id}].");
                 $trusted++;
             } catch (RuntimeException $e) {
