@@ -120,7 +120,9 @@ class XtreamStreamController extends Controller
                 ->where('channels.id', $streamId) // Qualify column name if pivot table involved
                 ->where('enabled', true)
                 ->first();
-        } elseif ($streamType === 'episode') {
+        }
+
+        if ($streamType === 'episode') {
             $episode = Episode::with('season.series')->find($streamId);
             if (! $episode) {
                 return null; // Episode or its hierarchy not found
@@ -199,9 +201,6 @@ class XtreamStreamController extends Controller
      *
      * @unauthenticated
      */
-    /**
-     * Live stream requests.
-     */
     public function handleLive(Request $request, string $username, string $password, string|int $streamId, ?string $format = null)
     {
         // Validate that streamId is numeric to prevent database errors
@@ -218,7 +217,7 @@ class XtreamStreamController extends Controller
         }
 
         if ($channel instanceof Channel) {
-            if ($playlist->enable_proxy || $request->input('proxy') === 'true') {
+            if ($channel->enable_proxy || $playlist->enable_proxy || $request->input('proxy') === 'true') {
                 // Timeshift handled in proxy controller (if needed)
                 // Add username to request for proxy traceability
                 $request->merge(['username' => $username]);
@@ -267,7 +266,7 @@ class XtreamStreamController extends Controller
         $format = $format ?? 'ts'; // Default to 'ts' if no format provided
         [$playlist, $channel] = $this->findAuthenticatedPlaylistAndStreamModel($username, $password, $streamId, 'vod');
         if ($channel instanceof Channel) {
-            if ($playlist->enable_proxy || $request->input('proxy') === 'true') {
+            if ($channel->enable_proxy || $playlist->enable_proxy || $request->input('proxy') === 'true') {
                 // Add username to request for proxy traceability
                 $request->merge(['username' => $username]);
 
