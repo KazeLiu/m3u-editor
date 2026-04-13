@@ -4,7 +4,7 @@
 
 <h3>m3u editor</h3>
 
-[English](./README.md) | [中文](./README-ZH.md)
+English | [中文](./README-ZH.md)
 
 </div>
 
